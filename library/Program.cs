@@ -1,6 +1,19 @@
-﻿using library;
+﻿using library.Models;
+using library.Repositories;
+using library.Services;
+using library.Strategies;
 
-List<Book> books = new();
+IBookRepository bookRepository =
+    new InMemoryBookRepository();
+
+BookService bookService =
+    new BookService(bookRepository);
+
+IDiscountStrategy discountStrategy =
+    new PercentageDiscountStrategy(0.1m);
+
+DiscountService discountService =
+    new DiscountService(discountStrategy);
 
 while (true)
 {
@@ -11,33 +24,38 @@ while (true)
     Console.WriteLine("3. Update Book");
     Console.WriteLine("4. Delete Book");
     Console.WriteLine("5. Search Book");
+    Console.WriteLine("6. Product Polymorphism & Discount Demo");
     Console.WriteLine("0. Exit");
     Console.Write("Enter your choice by number: ");
 
-    string? choice = Console.ReadLine();
+    string choice = Console.ReadLine() ?? "";
 
     Console.WriteLine();
 
     switch (choice)
     {
         case "1":
-            ListAllBooks(books);
+            ListAllBooks();
             break;
 
         case "2":
-            AddBook(books);
+            AddBook();
             break;
 
         case "3":
-            UpdateBook(books);
+            UpdateBook();
             break;
 
         case "4":
-            DeleteBook(books);
+            DeleteBook();
             break;
 
         case "5":
-            SearchBook(books);
+            SearchBook();
+            break;
+
+        case "6":
+            ShowProductDemo();
             break;
 
         case "0":
@@ -45,14 +63,19 @@ while (true)
             return;
 
         default:
-            Console.WriteLine("Invalid choice. Please try again.");
+            Console.WriteLine(
+                "Invalid choice. Please try again."
+            );
             break;
     }
 }
 
-void ListAllBooks(List<Book> books)
+void ListAllBooks()
 {
     Console.WriteLine("===== All Books =====");
+
+    List<Book> books =
+        bookService.GetAllBooks();
 
     if (books.Count == 0)
     {
@@ -63,206 +86,112 @@ void ListAllBooks(List<Book> books)
     foreach (Book book in books)
     {
         Console.WriteLine();
-        DisplayBook(book);
-        Console.WriteLine("----------------------------------------");
+        Console.WriteLine(book.GetDetails());
+        Console.WriteLine("--------------------------");
     }
 }
 
-void AddBook(List<Book> books)
+void AddBook()
 {
     Console.WriteLine("===== Add Book =====");
-    Console.WriteLine("Enter C at any time to cancel.");
+    Console.WriteLine(
+        "Enter C at any time to cancel."
+    );
+
     Console.WriteLine();
 
-    string title;
+    string? title =
+        ReadRequiredText("Title");
 
-    while (true)
+    if (title == null)
     {
-        Console.Write("Title    : ");
-        title = Console.ReadLine() ?? "";
-
-        if (IsCancel(title))
-        {
-            Console.WriteLine("Add book cancelled.");
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            break;
-        }
-
-        Console.WriteLine("Title cannot be empty.");
+        Console.WriteLine("Add book cancelled.");
+        return;
     }
 
-    string author;
+    string? author =
+        ReadRequiredText("Author");
 
-    while (true)
+    if (author == null)
     {
-        Console.Write("Author   : ");
-        author = Console.ReadLine() ?? "";
-
-        if (IsCancel(author))
-        {
-            Console.WriteLine("Add book cancelled.");
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(author))
-        {
-            break;
-        }
-
-        Console.WriteLine("Author cannot be empty.");
+        Console.WriteLine("Add book cancelled.");
+        return;
     }
 
-    string isbn;
+    string? isbn =
+        ReadISBN();
 
-    while (true)
+    if (isbn == null)
     {
-        Console.Write("ISBN     : ");
-        isbn = Console.ReadLine() ?? "";
-
-        if (IsCancel(isbn))
-        {
-            Console.WriteLine("Add book cancelled.");
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(isbn)
-            && isbn.All(char.IsDigit))
-        {
-            break;
-        }
-
-        Console.WriteLine(
-            "Invalid ISBN. Please enter numbers only."
-        );
+        Console.WriteLine("Add book cancelled.");
+        return;
     }
 
-    string category;
+    decimal? price =
+        ReadPrice();
 
-    while (true)
+    if (price == null)
     {
-        Console.Write("Category : ");
-        category = Console.ReadLine() ?? "";
-
-        if (IsCancel(category))
-        {
-            Console.WriteLine("Add book cancelled.");
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(category))
-        {
-            break;
-        }
-
-        Console.WriteLine("Category cannot be empty.");
+        Console.WriteLine("Add book cancelled.");
+        return;
     }
 
-    decimal price;
+    int? stock =
+        ReadStock();
 
-    while (true)
+    if (stock == null)
     {
-        Console.Write("Price    : RM ");
-        string? input = Console.ReadLine();
-
-        if (IsCancel(input))
-        {
-            Console.WriteLine("Add book cancelled.");
-            return;
-        }
-
-        if (decimal.TryParse(input, out price)
-            && price >= 0)
-        {
-            break;
-        }
-
-        Console.WriteLine(
-            "Invalid price. Please enter 0 or a positive number."
-        );
+        Console.WriteLine("Add book cancelled.");
+        return;
     }
 
-    int stock;
-
-    while (true)
+    Book book = new Book
     {
-        Console.Write("Stock    : ");
-        string? input = Console.ReadLine();
-
-        if (IsCancel(input))
-        {
-            Console.WriteLine("Add book cancelled.");
-            return;
-        }
-
-        if (int.TryParse(input, out stock)
-            && stock >= 0)
-        {
-            break;
-        }
-
-        Console.WriteLine(
-            "Invalid stock. Please enter 0 or a positive whole number."
-        );
-    }
-
-    int id = books.Count == 0
-        ? 1
-        : books.Max(book => book.Id) + 1;
-
-    Book newBook = new Book
-    {
-        Id = id,
         Title = title,
         Author = author,
         ISBN = isbn,
-        Category = category,
-        Price = price,
-        Stock = stock
+        Price = price.Value,
+        Stock = stock.Value
     };
 
-    books.Add(newBook);
+    try
+    {
+        bookService.AddBook(book);
 
-    Console.WriteLine();
-    Console.WriteLine("Book added successfully.");
-    Console.WriteLine();
-    DisplayBook(newBook);
+        Console.WriteLine();
+        Console.WriteLine(
+            "Book added successfully."
+        );
+
+        Console.WriteLine();
+        Console.WriteLine(book.GetDetails());
+    }
+    catch (ArgumentException ex)
+    {
+        Console.WriteLine(ex.Message);
+    }
 }
 
-void UpdateBook(List<Book> books)
+void UpdateBook()
 {
     Console.WriteLine("===== Update Book =====");
+    Console.WriteLine(
+        "Enter C at any time to cancel."
+    );
 
-    if (books.Count == 0)
-    {
-        Console.WriteLine("No books found.");
-        return;
-    }
-
-    Console.WriteLine("Enter C at any time to cancel.");
     Console.WriteLine();
 
-    Console.Write("Book ID   : ");
-    string? idInput = Console.ReadLine();
+    int? id =
+        ReadBookId();
 
-    if (IsCancel(idInput))
+    if (id == null)
     {
         Console.WriteLine("Update cancelled.");
         return;
     }
 
-    if (!int.TryParse(idInput, out int id))
-    {
-        Console.WriteLine("Invalid Book ID.");
-        return;
-    }
-
-    Book? book = books.FirstOrDefault(
-        book => book.Id == id
-    );
+    Book? book =
+        bookService.GetBookById(id.Value);
 
     if (book == null)
     {
@@ -271,421 +200,319 @@ void UpdateBook(List<Book> books)
     }
 
     Console.WriteLine();
-    Console.WriteLine("===== Selected Book =====");
-    Console.WriteLine();
-
-    DisplayBook(book);
-
-    Console.WriteLine();
-    Console.WriteLine("===== Choose What To Update =====");
-    Console.WriteLine("1. Title");
-    Console.WriteLine("2. Author");
-    Console.WriteLine("3. ISBN");
-    Console.WriteLine("4. Category");
-    Console.WriteLine("5. Price");
-    Console.WriteLine("6. Stock");
-    Console.WriteLine("7. Update All");
-    Console.WriteLine("C. Cancel");
-    Console.Write("Choice   : ");
-
-    string? choice = Console.ReadLine();
-
-    if (IsCancel(choice))
-    {
-        Console.WriteLine("Update cancelled.");
-        return;
-    }
-
-    switch (choice)
-    {
-        case "1":
-            while (true)
-            {
-                Console.Write("New Title    : ");
-                string? title = Console.ReadLine();
-
-                if (IsCancel(title))
-                {
-                    Console.WriteLine("Update cancelled.");
-                    return;
-                }
-
-                if (!string.IsNullOrWhiteSpace(title))
-                {
-                    book.Title = title;
-                    break;
-                }
-
-                Console.WriteLine("Title cannot be empty.");
-            }
-
-            break;
-
-        case "2":
-            while (true)
-            {
-                Console.Write("New Author   : ");
-                string? author = Console.ReadLine();
-
-                if (IsCancel(author))
-                {
-                    Console.WriteLine("Update cancelled.");
-                    return;
-                }
-
-                if (!string.IsNullOrWhiteSpace(author))
-                {
-                    book.Author = author;
-                    break;
-                }
-
-                Console.WriteLine("Author cannot be empty.");
-            }
-
-            break;
-
-        case "3":
-            while (true)
-            {
-                Console.Write("New ISBN     : ");
-                string? isbn = Console.ReadLine();
-
-                if (IsCancel(isbn))
-                {
-                    Console.WriteLine("Update cancelled.");
-                    return;
-                }
-
-                if (!string.IsNullOrWhiteSpace(isbn)
-                    && isbn.All(char.IsDigit))
-                {
-                    book.ISBN = isbn;
-                    break;
-                }
-
-                Console.WriteLine(
-                    "Invalid ISBN. Please enter numbers only."
-                );
-            }
-
-            break;
-
-        case "4":
-            while (true)
-            {
-                Console.Write("New Category : ");
-                string? category = Console.ReadLine();
-
-                if (IsCancel(category))
-                {
-                    Console.WriteLine("Update cancelled.");
-                    return;
-                }
-
-                if (!string.IsNullOrWhiteSpace(category))
-                {
-                    book.Category = category;
-                    break;
-                }
-
-                Console.WriteLine("Category cannot be empty.");
-            }
-
-            break;
-
-        case "5":
-            while (true)
-            {
-                Console.Write("New Price    : RM ");
-                string? input = Console.ReadLine();
-
-                if (IsCancel(input))
-                {
-                    Console.WriteLine("Update cancelled.");
-                    return;
-                }
-
-                if (decimal.TryParse(input, out decimal price)
-                    && price >= 0)
-                {
-                    book.Price = price;
-                    break;
-                }
-
-                Console.WriteLine(
-                    "Invalid price. Please enter 0 or a positive number."
-                );
-            }
-
-            break;
-
-        case "6":
-            while (true)
-            {
-                Console.Write("New Stock    : ");
-                string? input = Console.ReadLine();
-
-                if (IsCancel(input))
-                {
-                    Console.WriteLine("Update cancelled.");
-                    return;
-                }
-
-                if (int.TryParse(input, out int stock)
-                    && stock >= 0)
-                {
-                    book.Stock = stock;
-                    break;
-                }
-
-                Console.WriteLine(
-                    "Invalid stock. Please enter 0 or a positive whole number."
-                );
-            }
-
-            break;
-
-        case "7":
-            if (!UpdateAllBookDetails(book))
-            {
-                Console.WriteLine("Update cancelled.");
-                return;
-            }
-
-            break;
-
-        default:
-            Console.WriteLine("Invalid choice.");
-            return;
-    }
-
-    Console.WriteLine();
-    Console.WriteLine("Book updated successfully.");
-    Console.WriteLine();
-    Console.WriteLine("===== Updated Book =====");
-    Console.WriteLine();
-
-    DisplayBook(book);
-}
-
-bool UpdateAllBookDetails(Book book)
-{
-    Console.WriteLine();
-    Console.WriteLine("===== Update All Book Details =====");
-    Console.WriteLine("Enter C at any time to cancel.");
-    Console.WriteLine();
-
-    string title;
-
-    while (true)
-    {
-        Console.Write("Title    : ");
-        title = Console.ReadLine() ?? "";
-
-        if (IsCancel(title))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrWhiteSpace(title))
-        {
-            break;
-        }
-
-        Console.WriteLine("Title cannot be empty.");
-    }
-
-    string author;
-
-    while (true)
-    {
-        Console.Write("Author   : ");
-        author = Console.ReadLine() ?? "";
-
-        if (IsCancel(author))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrWhiteSpace(author))
-        {
-            break;
-        }
-
-        Console.WriteLine("Author cannot be empty.");
-    }
-
-    string isbn;
-
-    while (true)
-    {
-        Console.Write("ISBN     : ");
-        isbn = Console.ReadLine() ?? "";
-
-        if (IsCancel(isbn))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrWhiteSpace(isbn)
-            && isbn.All(char.IsDigit))
-        {
-            break;
-        }
-
-        Console.WriteLine(
-            "Invalid ISBN. Please enter numbers only."
-        );
-    }
-
-    string category;
-
-    while (true)
-    {
-        Console.Write("Category : ");
-        category = Console.ReadLine() ?? "";
-
-        if (IsCancel(category))
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrWhiteSpace(category))
-        {
-            break;
-        }
-
-        Console.WriteLine("Category cannot be empty.");
-    }
-
-    decimal price;
-
-    while (true)
-    {
-        Console.Write("Price    : RM ");
-        string? input = Console.ReadLine();
-
-        if (IsCancel(input))
-        {
-            return false;
-        }
-
-        if (decimal.TryParse(input, out price)
-            && price >= 0)
-        {
-            break;
-        }
-
-        Console.WriteLine(
-            "Invalid price. Please enter 0 or a positive number."
-        );
-    }
-
-    int stock;
-
-    while (true)
-    {
-        Console.Write("Stock    : ");
-        string? input = Console.ReadLine();
-
-        if (IsCancel(input))
-        {
-            return false;
-        }
-
-        if (int.TryParse(input, out stock)
-            && stock >= 0)
-        {
-            break;
-        }
-
-        Console.WriteLine(
-            "Invalid stock. Please enter 0 or a positive whole number."
-        );
-    }
-
-    book.Title = title;
-    book.Author = author;
-    book.ISBN = isbn;
-    book.Category = category;
-    book.Price = price;
-    book.Stock = stock;
-
-    return true;
-}
-
-void DeleteBook(List<Book> books)
-{
-    Console.WriteLine("===== Delete Book =====");
-
-    if (books.Count == 0)
-    {
-        Console.WriteLine("No books found.");
-        return;
-    }
-
-    Console.WriteLine("Enter C at any time to cancel.");
-    Console.WriteLine();
-
-    Console.Write("Book ID   : ");
-    string? idInput = Console.ReadLine();
-
-    if (IsCancel(idInput))
-    {
-        Console.WriteLine("Delete cancelled.");
-        return;
-    }
-
-    if (!int.TryParse(idInput, out int id))
-    {
-        Console.WriteLine("Invalid Book ID.");
-        return;
-    }
-
-    Book? book = books.FirstOrDefault(
-        book => book.Id == id
+    Console.WriteLine(
+        "===== Selected Book ====="
     );
 
-    if (book == null)
-    {
-        Console.WriteLine("Book not found.");
-        return;
-    }
-
     Console.WriteLine();
-    Console.WriteLine("===== Book To Delete =====");
-    Console.WriteLine();
-
-    DisplayBook(book);
+    Console.WriteLine(book.GetDetails());
 
     while (true)
     {
         Console.WriteLine();
-        Console.Write("Confirm delete (Y/N/C): ");
+        Console.WriteLine(
+            "===== Choose What To Update ====="
+        );
 
-        string? confirmation = Console.ReadLine();
+        Console.WriteLine("1. Title");
+        Console.WriteLine("2. Author");
+        Console.WriteLine("3. ISBN");
+        Console.WriteLine("4. Price");
+        Console.WriteLine("5. Stock");
+        Console.WriteLine("6. Update All");
+        Console.WriteLine("C. Cancel");
+        Console.Write("Choice: ");
 
-        if (string.Equals(
-            confirmation,
+        string choice =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(choice))
+        {
+            Console.WriteLine(
+                "Update cancelled."
+            );
+            return;
+        }
+
+        switch (choice)
+        {
+            case "1":
+                {
+                    string? title =
+                        ReadRequiredText(
+                            "New Title"
+                        );
+
+                    if (title == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.Title = title;
+                    break;
+                }
+
+            case "2":
+                {
+                    string? author =
+                        ReadRequiredText(
+                            "New Author"
+                        );
+
+                    if (author == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.Author = author;
+                    break;
+                }
+
+            case "3":
+                {
+                    string? isbn =
+                        ReadISBN("New ISBN");
+
+                    if (isbn == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.ISBN = isbn;
+                    break;
+                }
+
+            case "4":
+                {
+                    decimal? price =
+                        ReadPrice("New Price");
+
+                    if (price == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.Price = price.Value;
+                    break;
+                }
+
+            case "5":
+                {
+                    int? stock =
+                        ReadStock("New Stock");
+
+                    if (stock == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.Stock = stock.Value;
+                    break;
+                }
+
+            case "6":
+                {
+                    string? title =
+                        ReadRequiredText(
+                            "New Title"
+                        );
+
+                    if (title == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    string? author =
+                        ReadRequiredText(
+                            "New Author"
+                        );
+
+                    if (author == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    string? isbn =
+                        ReadISBN("New ISBN");
+
+                    if (isbn == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    decimal? price =
+                        ReadPrice("New Price");
+
+                    if (price == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    int? stock =
+                        ReadStock("New Stock");
+
+                    if (stock == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.Title = title;
+                    book.Author = author;
+                    book.ISBN = isbn;
+                    book.Price = price.Value;
+                    book.Stock = stock.Value;
+
+                    break;
+                }
+
+            default:
+                Console.WriteLine(
+                    "Invalid choice."
+                );
+                continue;
+        }
+
+        try
+        {
+            bool updated =
+                bookService.UpdateBook(book);
+
+            if (!updated)
+            {
+                Console.WriteLine(
+                    "Book not found."
+                );
+
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "Book updated successfully."
+            );
+
+            Console.WriteLine();
+            Console.WriteLine(book.GetDetails());
+
+            return;
+        }
+        catch (ArgumentException ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+}
+
+void DeleteBook()
+{
+    Console.WriteLine("===== Delete Book =====");
+    Console.WriteLine(
+        "Enter C at any time to cancel."
+    );
+
+    Console.WriteLine();
+
+    int? id =
+        ReadBookId();
+
+    if (id == null)
+    {
+        Console.WriteLine(
+            "Delete cancelled."
+        );
+        return;
+    }
+
+    Book? book =
+        bookService.GetBookById(id.Value);
+
+    if (book == null)
+    {
+        Console.WriteLine("Book not found.");
+        return;
+    }
+
+    Console.WriteLine();
+    Console.WriteLine(
+        "===== Book To Delete ====="
+    );
+
+    Console.WriteLine();
+    Console.WriteLine(book.GetDetails());
+
+    while (true)
+    {
+        Console.WriteLine();
+        Console.Write(
+            "Confirm delete (Y/N/C): "
+        );
+
+        string confirmation =
+            Console.ReadLine() ?? "";
+
+        if (confirmation.Equals(
             "Y",
             StringComparison.OrdinalIgnoreCase))
         {
-            books.Remove(book);
+            bool deleted =
+                bookService.DeleteBook(id.Value);
 
-            Console.WriteLine(
-                "Book deleted successfully."
-            );
+            if (deleted)
+            {
+                Console.WriteLine(
+                    "Book deleted successfully."
+                );
+            }
+            else
+            {
+                Console.WriteLine(
+                    "Book not found."
+                );
+            }
 
             return;
         }
 
-        if (string.Equals(
-            confirmation,
-            "N",
-            StringComparison.OrdinalIgnoreCase)
-            || IsCancel(confirmation))
+        if (confirmation.Equals(
+                "N",
+                StringComparison.OrdinalIgnoreCase)
+            ||
+            IsCancel(confirmation))
         {
-            Console.WriteLine("Delete cancelled.");
+            Console.WriteLine(
+                "Delete cancelled."
+            );
+
             return;
         }
 
@@ -695,80 +522,307 @@ void DeleteBook(List<Book> books)
     }
 }
 
-void SearchBook(List<Book> books)
+void SearchBook()
 {
     Console.WriteLine("===== Search Book =====");
-
-    if (books.Count == 0)
-    {
-        Console.WriteLine("No books found.");
-        return;
-    }
-
-    Console.WriteLine("Enter C at any time to cancel.");
-    Console.WriteLine();
-
-    Console.Write("Title/ISBN: ");
-    string searchTerm = Console.ReadLine() ?? "";
-
-    if (IsCancel(searchTerm))
-    {
-        Console.WriteLine("Search cancelled.");
-        return;
-    }
-
-    if (string.IsNullOrWhiteSpace(searchTerm))
-    {
-        Console.WriteLine("Search cannot be empty.");
-        return;
-    }
-
-    List<Book> searchResults = books
-        .Where(book =>
-            book.Title.Contains(
-                searchTerm,
-                StringComparison.OrdinalIgnoreCase
-            )
-            ||
-            book.ISBN.Contains(
-                searchTerm,
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-        .ToList();
-
-    if (searchResults.Count == 0)
-    {
-        Console.WriteLine("No matching books found.");
-        return;
-    }
+    Console.WriteLine(
+        "Enter C at any time to cancel."
+    );
 
     Console.WriteLine();
-    Console.WriteLine("===== Search Results =====");
 
-    foreach (Book book in searchResults)
+    while (true)
+    {
+        Console.Write("Title/ISBN: ");
+
+        string keyword =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(keyword))
+        {
+            Console.WriteLine(
+                "Search cancelled."
+            );
+
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            keyword))
+        {
+            Console.WriteLine(
+                "Search cannot be empty."
+            );
+
+            continue;
+        }
+
+        List<Book> results =
+            bookService.SearchBooks(keyword);
+
+        if (results.Count == 0)
+        {
+            Console.WriteLine(
+                "No matching books found."
+            );
+
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(
+            "===== Search Results ====="
+        );
+
+        foreach (Book book in results)
+        {
+            Console.WriteLine();
+            Console.WriteLine(book.GetDetails());
+            Console.WriteLine(
+                "--------------------------"
+            );
+        }
+
+        return;
+    }
+}
+
+void ShowProductDemo()
+{
+    Console.WriteLine(
+        "===== Product Polymorphism Demo ====="
+    );
+
+    List<Product> products = new();
+
+    List<Book> currentBooks =
+        bookService.GetAllBooks();
+
+    if (currentBooks.Count > 0)
+    {
+        products.Add(currentBooks[0]);
+    }
+    else
+    {
+        Book demoBook = new Book
+        {
+            Id = 1001,
+            Title = "Clean Code",
+            Author = "Robert C. Martin",
+            ISBN = "123456789",
+            Price = 50m,
+            Stock = 5
+        };
+
+        products.Add(demoBook);
+    }
+
+    Magazine magazine =
+        new Magazine
+        {
+            Id = 1002,
+            Title = "Tech Monthly",
+            Publisher = "Tech Media",
+            IssueNumber = 10,
+            PublishedDate =
+                new DateOnly(
+                    2026,
+                    9,
+                    1
+                ),
+            Price = 20m,
+            Stock = 10
+        };
+
+    products.Add(magazine);
+
+    foreach (Product product in products)
     {
         Console.WriteLine();
-        DisplayBook(book);
-        Console.WriteLine("----------------------------------------");
+        Console.WriteLine(
+            product.GetDetails()
+        );
+
+        decimal discountedPrice =
+            discountService
+                .CalculateDiscountedPrice(
+                    product
+                );
+
+        Console.WriteLine(
+            $"10% Discount Price : RM {discountedPrice:F2}"
+        );
+
+        Console.WriteLine(
+            "--------------------------"
+        );
     }
 }
 
-void DisplayBook(Book book)
+string? ReadRequiredText(
+    string fieldName)
 {
-    Console.WriteLine($"ID       : {book.Id}");
-    Console.WriteLine($"Title    : {book.Title}");
-    Console.WriteLine($"Author   : {book.Author}");
-    Console.WriteLine($"ISBN     : {book.ISBN}");
-    Console.WriteLine($"Category : {book.Category}");
-    Console.WriteLine($"Price    : RM {book.Price:F2}");
-    Console.WriteLine($"Stock    : {book.Stock}");
+    while (true)
+    {
+        Console.Write(
+            $"{fieldName} : "
+        );
+
+        string value =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(value))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+            value))
+        {
+            Console.WriteLine(
+                $"{fieldName} cannot be empty."
+            );
+
+            continue;
+        }
+
+        return value.Trim();
+    }
 }
 
-bool IsCancel(string? input)
+string? ReadISBN(
+    string fieldName = "ISBN")
 {
-    return string.Equals(
-        input,
+    while (true)
+    {
+        Console.Write(
+            $"{fieldName} : "
+        );
+
+        string value =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(value))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                value)
+            ||
+            !value.All(char.IsDigit))
+        {
+            Console.WriteLine(
+                "Invalid ISBN. Please enter numbers only."
+            );
+
+            continue;
+        }
+
+        return value;
+    }
+}
+
+decimal? ReadPrice(
+    string fieldName = "Price")
+{
+    while (true)
+    {
+        Console.Write(
+            $"{fieldName} : "
+        );
+
+        string input =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(input))
+        {
+            return null;
+        }
+
+        if (!decimal.TryParse(
+                input,
+                out decimal price)
+            ||
+            price < 0)
+        {
+            Console.WriteLine(
+                "Invalid price. Please enter 0 or a positive number."
+            );
+
+            continue;
+        }
+
+        return price;
+    }
+}
+
+int? ReadStock(
+    string fieldName = "Stock")
+{
+    while (true)
+    {
+        Console.Write(
+            $"{fieldName} : "
+        );
+
+        string input =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(input))
+        {
+            return null;
+        }
+
+        if (!int.TryParse(
+                input,
+                out int stock)
+            ||
+            stock < 0)
+        {
+            Console.WriteLine(
+                "Invalid stock. Please enter 0 or a positive whole number."
+            );
+
+            continue;
+        }
+
+        return stock;
+    }
+}
+
+int? ReadBookId()
+{
+    while (true)
+    {
+        Console.Write("Book ID : ");
+
+        string input =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(input))
+        {
+            return null;
+        }
+
+        if (!int.TryParse(
+                input,
+                out int id))
+        {
+            Console.WriteLine(
+                "Invalid Book ID."
+            );
+
+            continue;
+        }
+
+        return id;
+    }
+}
+
+bool IsCancel(string input)
+{
+    return input.Equals(
         "C",
         StringComparison.OrdinalIgnoreCase
     );
