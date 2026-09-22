@@ -6,16 +6,18 @@ public class Book : Product
 
     public string ISBN { get; set; } = "";
 
+    public string Category { get; set; } = "";
+
     public override string GetDetails()
     {
-        return 
+        return
             $"Type     : Book\n" +
             $"ID       : {Id}\n" +
             $"Title    : {Title}\n" +
             $"Author   : {Author}\n" +
             $"ISBN     : {ISBN}\n" +
+            $"Category : {Category}\n" +
             $"Price    : RM {Price:F2}\n" +
             $"Stock    : {Stock}";
     }
 }
-

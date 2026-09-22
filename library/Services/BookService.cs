@@ -4,7 +4,7 @@ using library.Repositories;
 namespace library.Services;
 
 public class BookService
-{ 
+{
     private readonly IBookRepository _repository;
 
     public BookService(IBookRepository repository)
@@ -24,17 +24,25 @@ public class BookService
 
     public List<Book> SearchBooks(string keyword)
     {
-        return _repository.Search(keyword);
+        if (string.IsNullOrWhiteSpace(keyword))
+        {
+            return new List<Book>();
+        }
+
+        return _repository.Search(keyword.Trim());
     }
 
     public void AddBook(Book book)
     {
+        ValidateBook(book);
+
         _repository.Add(book);
     }
 
     public bool UpdateBook(Book book)
     {
-        Book? existingBook = _repository.GetById(book.Id);
+        Book? existingBook =
+            _repository.GetById(book.Id);
 
         if (existingBook == null)
         {
@@ -50,12 +58,16 @@ public class BookService
 
     public bool DeleteBook(int id)
     {
-        Book? existingBook = _repository.GetById(id);
+        Book? existingBook =
+            _repository.GetById(id);
+
         if (existingBook == null)
         {
             return false;
         }
+
         _repository.Delete(id);
+
         return true;
     }
 
@@ -63,19 +75,37 @@ public class BookService
     {
         if (string.IsNullOrWhiteSpace(book.Title))
         {
-            throw new ArgumentException("Title cannot be empty.");
+            throw new ArgumentException(
+                "Title cannot be empty."
+            );
         }
+
         if (string.IsNullOrWhiteSpace(book.Author))
         {
-            throw new ArgumentException("Author cannot be empty.");
+            throw new ArgumentException(
+                "Author cannot be empty."
+            );
         }
+
         if (string.IsNullOrWhiteSpace(book.ISBN))
         {
-            throw new ArgumentException("ISBN cannot be empty.");
+            throw new ArgumentException(
+                "ISBN cannot be empty."
+            );
         }
+
         if (!book.ISBN.All(char.IsDigit))
         {
-            throw new ArgumentException("ISBN must contain numbers only.");
+            throw new ArgumentException(
+                "ISBN must contain numbers only."
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(book.Category))
+        {
+            throw new ArgumentException(
+                "Category cannot be empty."
+            );
         }
     }
 }

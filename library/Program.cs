@@ -1,4 +1,5 @@
-﻿using library.Models;
+﻿using System.Globalization;
+using library.Models;
 using library.Repositories;
 using library.Services;
 using library.Strategies;
@@ -15,11 +16,7 @@ IMagazineRepository magazineRepository =
 MagazineService magazineService =
     new MagazineService(magazineRepository);
 
-IDiscountStrategy discountStrategy =
-    new PercentageDiscountStrategy(0.1m);
-
-DiscountService discountService =
-    new DiscountService(discountStrategy);
+const int LabelWidth = 30;
 
 while (true)
 {
@@ -187,7 +184,9 @@ void ListAllBooks()
     {
         Console.WriteLine();
         Console.WriteLine(book.GetDetails());
-        Console.WriteLine("--------------------------");
+        Console.WriteLine(
+            "------------------------------"
+        );
     }
 }
 
@@ -197,7 +196,6 @@ void AddBook()
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
-
     Console.WriteLine();
 
     string? title =
@@ -205,7 +203,9 @@ void AddBook()
 
     if (title == null)
     {
-        Console.WriteLine("Add book cancelled.");
+        Console.WriteLine(
+            "Add book cancelled."
+        );
         return;
     }
 
@@ -214,7 +214,9 @@ void AddBook()
 
     if (author == null)
     {
-        Console.WriteLine("Add book cancelled.");
+        Console.WriteLine(
+            "Add book cancelled."
+        );
         return;
     }
 
@@ -223,7 +225,20 @@ void AddBook()
 
     if (isbn == null)
     {
-        Console.WriteLine("Add book cancelled.");
+        Console.WriteLine(
+            "Add book cancelled."
+        );
+        return;
+    }
+
+    string? category =
+        ReadRequiredText("Category");
+
+    if (category == null)
+    {
+        Console.WriteLine(
+            "Add book cancelled."
+        );
         return;
     }
 
@@ -232,7 +247,9 @@ void AddBook()
 
     if (price == null)
     {
-        Console.WriteLine("Add book cancelled.");
+        Console.WriteLine(
+            "Add book cancelled."
+        );
         return;
     }
 
@@ -241,7 +258,9 @@ void AddBook()
 
     if (stock == null)
     {
-        Console.WriteLine("Add book cancelled.");
+        Console.WriteLine(
+            "Add book cancelled."
+        );
         return;
     }
 
@@ -250,6 +269,7 @@ void AddBook()
         Title = title,
         Author = author,
         ISBN = isbn,
+        Category = category,
         Price = price.Value,
         Stock = stock.Value
     };
@@ -262,9 +282,10 @@ void AddBook()
         Console.WriteLine(
             "Book added successfully."
         );
-
         Console.WriteLine();
-        Console.WriteLine(book.GetDetails());
+        Console.WriteLine(
+            book.GetDetails()
+        );
     }
     catch (ArgumentException ex)
     {
@@ -278,7 +299,6 @@ void UpdateBook()
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
-
     Console.WriteLine();
 
     int? id =
@@ -286,21 +306,33 @@ void UpdateBook()
 
     if (id == null)
     {
-        Console.WriteLine("Update cancelled.");
+        Console.WriteLine(
+            "Update cancelled."
+        );
         return;
     }
 
     Book? book =
-        bookService.GetBookById(id.Value);
+        bookService.GetBookById(
+            id.Value
+        );
 
     if (book == null)
     {
-        Console.WriteLine("Book not found.");
+        Console.WriteLine(
+            "Book not found."
+        );
         return;
     }
 
     Console.WriteLine();
-    Console.WriteLine(book.GetDetails());
+    Console.WriteLine(
+        "===== Selected Book ====="
+    );
+    Console.WriteLine();
+    Console.WriteLine(
+        book.GetDetails()
+    );
 
     while (true)
     {
@@ -311,9 +343,10 @@ void UpdateBook()
         Console.WriteLine("1. Title");
         Console.WriteLine("2. Author");
         Console.WriteLine("3. ISBN");
-        Console.WriteLine("4. Price");
-        Console.WriteLine("5. Stock");
-        Console.WriteLine("6. Update All");
+        Console.WriteLine("4. Category");
+        Console.WriteLine("5. Price");
+        Console.WriteLine("6. Stock");
+        Console.WriteLine("7. Update All");
         Console.WriteLine("C. Cancel");
         Console.Write("Choice: ");
 
@@ -322,7 +355,9 @@ void UpdateBook()
 
         if (IsCancel(choice))
         {
-            Console.WriteLine("Update cancelled.");
+            Console.WriteLine(
+                "Update cancelled."
+            );
             return;
         }
 
@@ -331,7 +366,9 @@ void UpdateBook()
             case "1":
                 {
                     string? title =
-                        ReadRequiredText("New Title");
+                        ReadRequiredText(
+                            "New Title"
+                        );
 
                     if (title == null)
                     {
@@ -348,7 +385,9 @@ void UpdateBook()
             case "2":
                 {
                     string? author =
-                        ReadRequiredText("New Author");
+                        ReadRequiredText(
+                            "New Author"
+                        );
 
                     if (author == null)
                     {
@@ -365,7 +404,9 @@ void UpdateBook()
             case "3":
                 {
                     string? isbn =
-                        ReadISBN("New ISBN");
+                        ReadISBN(
+                            "New ISBN"
+                        );
 
                     if (isbn == null)
                     {
@@ -381,8 +422,29 @@ void UpdateBook()
 
             case "4":
                 {
+                    string? category =
+                        ReadRequiredText(
+                            "New Category"
+                        );
+
+                    if (category == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
+                    book.Category = category;
+                    break;
+                }
+
+            case "5":
+                {
                     decimal? price =
-                        ReadPrice("New Price");
+                        ReadPrice(
+                            "New Price"
+                        );
 
                     if (price == null)
                     {
@@ -392,14 +454,17 @@ void UpdateBook()
                         return;
                     }
 
-                    book.Price = price.Value;
+                    book.Price =
+                        price.Value;
                     break;
                 }
 
-            case "5":
+            case "6":
                 {
                     int? stock =
-                        ReadStock("New Stock");
+                        ReadStock(
+                            "New Stock"
+                        );
 
                     if (stock == null)
                     {
@@ -409,14 +474,17 @@ void UpdateBook()
                         return;
                     }
 
-                    book.Stock = stock.Value;
+                    book.Stock =
+                        stock.Value;
                     break;
                 }
 
-            case "6":
+            case "7":
                 {
                     string? title =
-                        ReadRequiredText("New Title");
+                        ReadRequiredText(
+                            "New Title"
+                        );
 
                     if (title == null)
                     {
@@ -427,7 +495,9 @@ void UpdateBook()
                     }
 
                     string? author =
-                        ReadRequiredText("New Author");
+                        ReadRequiredText(
+                            "New Author"
+                        );
 
                     if (author == null)
                     {
@@ -438,7 +508,9 @@ void UpdateBook()
                     }
 
                     string? isbn =
-                        ReadISBN("New ISBN");
+                        ReadISBN(
+                            "New ISBN"
+                        );
 
                     if (isbn == null)
                     {
@@ -448,8 +520,23 @@ void UpdateBook()
                         return;
                     }
 
+                    string? category =
+                        ReadRequiredText(
+                            "New Category"
+                        );
+
+                    if (category == null)
+                    {
+                        Console.WriteLine(
+                            "Update cancelled."
+                        );
+                        return;
+                    }
+
                     decimal? price =
-                        ReadPrice("New Price");
+                        ReadPrice(
+                            "New Price"
+                        );
 
                     if (price == null)
                     {
@@ -460,7 +547,9 @@ void UpdateBook()
                     }
 
                     int? stock =
-                        ReadStock("New Stock");
+                        ReadStock(
+                            "New Stock"
+                        );
 
                     if (stock == null)
                     {
@@ -473,6 +562,7 @@ void UpdateBook()
                     book.Title = title;
                     book.Author = author;
                     book.ISBN = isbn;
+                    book.Category = category;
                     book.Price = price.Value;
                     book.Stock = stock.Value;
 
@@ -480,18 +570,24 @@ void UpdateBook()
                 }
 
             default:
-                Console.WriteLine("Invalid choice.");
+                Console.WriteLine(
+                    "Invalid choice."
+                );
                 continue;
         }
 
         try
         {
             bool updated =
-                bookService.UpdateBook(book);
+                bookService.UpdateBook(
+                    book
+                );
 
             if (!updated)
             {
-                Console.WriteLine("Book not found.");
+                Console.WriteLine(
+                    "Book not found."
+                );
                 return;
             }
 
@@ -499,81 +595,122 @@ void UpdateBook()
             Console.WriteLine(
                 "Book updated successfully."
             );
-
             Console.WriteLine();
-            Console.WriteLine(book.GetDetails());
+            Console.WriteLine(
+                book.GetDetails()
+            );
 
             return;
         }
         catch (ArgumentException ex)
         {
-            Console.WriteLine(ex.Message);
+            Console.WriteLine(
+                ex.Message
+            );
         }
     }
 }
 
 void DeleteBook()
 {
-    Console.WriteLine("===== Delete Book =====");
+    Console.WriteLine(
+        "===== Delete Book ====="
+    );
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+    Console.WriteLine();
 
     int? id =
         ReadId("Book ID");
 
     if (id == null)
     {
-        Console.WriteLine("Delete cancelled.");
+        Console.WriteLine(
+            "Delete cancelled."
+        );
         return;
     }
 
     Book? book =
-        bookService.GetBookById(id.Value);
+        bookService.GetBookById(
+            id.Value
+        );
 
     if (book == null)
     {
-        Console.WriteLine("Book not found.");
+        Console.WriteLine(
+            "Book not found."
+        );
         return;
     }
 
     Console.WriteLine();
-    Console.WriteLine(book.GetDetails());
+    Console.WriteLine(
+        "===== Book To Delete ====="
+    );
+    Console.WriteLine();
+    Console.WriteLine(
+        book.GetDetails()
+    );
+    Console.WriteLine();
 
     if (!ConfirmDelete())
     {
-        Console.WriteLine("Delete cancelled.");
+        Console.WriteLine(
+            "Delete cancelled."
+        );
         return;
     }
 
-    bookService.DeleteBook(id.Value);
+    bool deleted =
+        bookService.DeleteBook(
+            id.Value
+        );
 
-    Console.WriteLine(
-        "Book deleted successfully."
-    );
+    if (deleted)
+    {
+        Console.WriteLine(
+            "Book deleted successfully."
+        );
+    }
+    else
+    {
+        Console.WriteLine(
+            "Book not found."
+        );
+    }
 }
 
 void SearchBook()
 {
-    Console.WriteLine("===== Search Book =====");
+    Console.WriteLine(
+        "===== Search Book ====="
+    );
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+    Console.WriteLine();
 
     while (true)
     {
-        Console.Write("Title/ISBN: ");
+        Console.Write(
+            "Title/ISBN: "
+        );
 
         string keyword =
             Console.ReadLine() ?? "";
 
         if (IsCancel(keyword))
         {
-            Console.WriteLine("Search cancelled.");
+            Console.WriteLine(
+                "Search cancelled."
+            );
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(keyword))
+        if (string.IsNullOrWhiteSpace(
+            keyword))
         {
             Console.WriteLine(
                 "Search cannot be empty."
@@ -582,7 +719,9 @@ void SearchBook()
         }
 
         List<Book> results =
-            bookService.SearchBooks(keyword);
+            bookService.SearchBooks(
+                keyword
+            );
 
         if (results.Count == 0)
         {
@@ -592,11 +731,20 @@ void SearchBook()
             return;
         }
 
+        Console.WriteLine();
+        Console.WriteLine(
+            "===== Search Results ====="
+        );
+
         foreach (Book book in results)
         {
             Console.WriteLine();
-            Console.WriteLine(book.GetDetails());
-            Console.WriteLine("--------------------------");
+            Console.WriteLine(
+                book.GetDetails()
+            );
+            Console.WriteLine(
+                "------------------------------"
+            );
         }
 
         return;
@@ -605,10 +753,13 @@ void SearchBook()
 
 void ListAllMagazines()
 {
-    Console.WriteLine("===== All Magazines =====");
+    Console.WriteLine(
+        "===== All Magazines ====="
+    );
 
     List<Magazine> magazines =
-        magazineService.GetAllMagazines();
+        magazineService
+            .GetAllMagazines();
 
     if (magazines.Count == 0)
     {
@@ -624,17 +775,20 @@ void ListAllMagazines()
         Console.WriteLine(
             magazine.GetDetails()
         );
-        Console.WriteLine("--------------------------");
+        Console.WriteLine(
+            "------------------------------"
+        );
     }
 }
 
 void AddMagazine()
 {
-    Console.WriteLine("===== Add Magazine =====");
+    Console.WriteLine(
+        "===== Add Magazine ====="
+    );
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
-
     Console.WriteLine();
 
     string? title =
@@ -649,7 +803,9 @@ void AddMagazine()
     }
 
     string? publisher =
-        ReadRequiredText("Publisher");
+        ReadRequiredText(
+            "Publisher"
+        );
 
     if (publisher == null)
     {
@@ -660,7 +816,9 @@ void AddMagazine()
     }
 
     int? issueNumber =
-        ReadPositiveInt("Issue Number");
+        ReadPositiveInt(
+            "Issue Number"
+        );
 
     if (issueNumber == null)
     {
@@ -671,7 +829,9 @@ void AddMagazine()
     }
 
     DateOnly? publishedDate =
-        ReadDate("Published Date");
+        ReadDate(
+            "Published Date"
+        );
 
     if (publishedDate == null)
     {
@@ -703,16 +863,19 @@ void AddMagazine()
         return;
     }
 
-    Magazine magazine =
-        new Magazine
-        {
-            Title = title,
-            Publisher = publisher,
-            IssueNumber = issueNumber.Value,
-            PublishedDate = publishedDate.Value,
-            Price = price.Value,
-            Stock = stock.Value
-        };
+    Magazine magazine = new Magazine
+    {
+        Title = title,
+        Publisher = publisher,
+        IssueNumber =
+            issueNumber.Value,
+        PublishedDate =
+            publishedDate.Value,
+        Price =
+            price.Value,
+        Stock =
+            stock.Value
+    };
 
     try
     {
@@ -724,7 +887,6 @@ void AddMagazine()
         Console.WriteLine(
             "Magazine added successfully."
         );
-
         Console.WriteLine();
         Console.WriteLine(
             magazine.GetDetails()
@@ -732,30 +894,40 @@ void AddMagazine()
     }
     catch (ArgumentException ex)
     {
-        Console.WriteLine(ex.Message);
+        Console.WriteLine(
+            ex.Message
+        );
     }
 }
 
 void UpdateMagazine()
 {
-    Console.WriteLine("===== Update Magazine =====");
+    Console.WriteLine(
+        "===== Update Magazine ====="
+    );
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+    Console.WriteLine();
 
     int? id =
-        ReadId("Magazine ID");
+        ReadId(
+            "Magazine ID"
+        );
 
     if (id == null)
     {
-        Console.WriteLine("Update cancelled.");
+        Console.WriteLine(
+            "Update cancelled."
+        );
         return;
     }
 
     Magazine? magazine =
-        magazineService.GetMagazineById(
-            id.Value
-        );
+        magazineService
+            .GetMagazineById(
+                id.Value
+            );
 
     if (magazine == null)
     {
@@ -791,7 +963,9 @@ void UpdateMagazine()
 
         if (IsCancel(choice))
         {
-            Console.WriteLine("Update cancelled.");
+            Console.WriteLine(
+                "Update cancelled."
+            );
             return;
         }
 
@@ -800,7 +974,9 @@ void UpdateMagazine()
             case "1":
                 {
                     string? title =
-                        ReadRequiredText("New Title");
+                        ReadRequiredText(
+                            "New Title"
+                        );
 
                     if (title == null)
                     {
@@ -810,7 +986,8 @@ void UpdateMagazine()
                         return;
                     }
 
-                    magazine.Title = title;
+                    magazine.Title =
+                        title;
                     break;
                 }
 
@@ -831,7 +1008,6 @@ void UpdateMagazine()
 
                     magazine.Publisher =
                         publisher;
-
                     break;
                 }
 
@@ -852,7 +1028,6 @@ void UpdateMagazine()
 
                     magazine.IssueNumber =
                         issueNumber.Value;
-
                     break;
                 }
 
@@ -873,14 +1048,15 @@ void UpdateMagazine()
 
                     magazine.PublishedDate =
                         date.Value;
-
                     break;
                 }
 
             case "5":
                 {
                     decimal? price =
-                        ReadPrice("New Price");
+                        ReadPrice(
+                            "New Price"
+                        );
 
                     if (price == null)
                     {
@@ -892,14 +1068,15 @@ void UpdateMagazine()
 
                     magazine.Price =
                         price.Value;
-
                     break;
                 }
 
             case "6":
                 {
                     int? stock =
-                        ReadStock("New Stock");
+                        ReadStock(
+                            "New Stock"
+                        );
 
                     if (stock == null)
                     {
@@ -911,7 +1088,6 @@ void UpdateMagazine()
 
                     magazine.Stock =
                         stock.Value;
-
                     break;
                 }
 
@@ -970,7 +1146,9 @@ void UpdateMagazine()
                     }
 
                     decimal? price =
-                        ReadPrice("New Price");
+                        ReadPrice(
+                            "New Price"
+                        );
 
                     if (price == null)
                     {
@@ -981,7 +1159,9 @@ void UpdateMagazine()
                     }
 
                     int? stock =
-                        ReadStock("New Stock");
+                        ReadStock(
+                            "New Stock"
+                        );
 
                     if (stock == null)
                     {
@@ -991,8 +1171,10 @@ void UpdateMagazine()
                         return;
                     }
 
-                    magazine.Title = title;
-                    magazine.Publisher = publisher;
+                    magazine.Title =
+                        title;
+                    magazine.Publisher =
+                        publisher;
                     magazine.IssueNumber =
                         issueNumber.Value;
                     magazine.PublishedDate =
@@ -1032,7 +1214,6 @@ void UpdateMagazine()
             Console.WriteLine(
                 "Magazine updated successfully."
             );
-
             Console.WriteLine();
             Console.WriteLine(
                 magazine.GetDetails()
@@ -1042,31 +1223,41 @@ void UpdateMagazine()
         }
         catch (ArgumentException ex)
         {
-            Console.WriteLine(ex.Message);
+            Console.WriteLine(
+                ex.Message
+            );
         }
     }
 }
 
 void DeleteMagazine()
 {
-    Console.WriteLine("===== Delete Magazine =====");
+    Console.WriteLine(
+        "===== Delete Magazine ====="
+    );
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+    Console.WriteLine();
 
     int? id =
-        ReadId("Magazine ID");
+        ReadId(
+            "Magazine ID"
+        );
 
     if (id == null)
     {
-        Console.WriteLine("Delete cancelled.");
+        Console.WriteLine(
+            "Delete cancelled."
+        );
         return;
     }
 
     Magazine? magazine =
-        magazineService.GetMagazineById(
-            id.Value
-        );
+        magazineService
+            .GetMagazineById(
+                id.Value
+            );
 
     if (magazine == null)
     {
@@ -1080,6 +1271,7 @@ void DeleteMagazine()
     Console.WriteLine(
         magazine.GetDetails()
     );
+    Console.WriteLine();
 
     if (!ConfirmDelete())
     {
@@ -1089,21 +1281,35 @@ void DeleteMagazine()
         return;
     }
 
-    magazineService.DeleteMagazine(
-        id.Value
-    );
+    bool deleted =
+        magazineService
+            .DeleteMagazine(
+                id.Value
+            );
 
-    Console.WriteLine(
-        "Magazine deleted successfully."
-    );
+    if (deleted)
+    {
+        Console.WriteLine(
+            "Magazine deleted successfully."
+        );
+    }
+    else
+    {
+        Console.WriteLine(
+            "Magazine not found."
+        );
+    }
 }
 
 void SearchMagazine()
 {
-    Console.WriteLine("===== Search Magazine =====");
+    Console.WriteLine(
+        "===== Search Magazine ====="
+    );
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+    Console.WriteLine();
 
     while (true)
     {
@@ -1145,6 +1351,11 @@ void SearchMagazine()
             return;
         }
 
+        Console.WriteLine();
+        Console.WriteLine(
+            "===== Search Results ====="
+        );
+
         foreach (Magazine magazine in results)
         {
             Console.WriteLine();
@@ -1152,7 +1363,7 @@ void SearchMagazine()
                 magazine.GetDetails()
             );
             Console.WriteLine(
-                "--------------------------"
+                "------------------------------"
             );
         }
 
@@ -1166,14 +1377,16 @@ void ViewAllProducts()
         "===== All Products ====="
     );
 
-    List<Product> products = new();
+    List<Product> products =
+        new();
 
     products.AddRange(
         bookService.GetAllBooks()
     );
 
     products.AddRange(
-        magazineService.GetAllMagazines()
+        magazineService
+            .GetAllMagazines()
     );
 
     if (products.Count == 0)
@@ -1191,7 +1404,7 @@ void ViewAllProducts()
             product.GetDetails()
         );
         Console.WriteLine(
-            "--------------------------"
+            "------------------------------"
         );
     }
 }
@@ -1204,10 +1417,21 @@ void DiscountMenu()
         Console.WriteLine(
             "===== Product Discount ====="
         );
-        Console.WriteLine("1. Book");
-        Console.WriteLine("2. Magazine");
-        Console.WriteLine("0. Back");
-        Console.Write("Enter your choice: ");
+        Console.WriteLine(
+            "1. Apply / Change Book Discount"
+        );
+        Console.WriteLine(
+            "2. Apply / Change Magazine Discount"
+        );
+        Console.WriteLine(
+            "3. List All Product Discounts"
+        );
+        Console.WriteLine(
+            "0. Back"
+        );
+        Console.Write(
+            "Enter your choice: "
+        );
 
         string choice =
             Console.ReadLine() ?? "";
@@ -1224,12 +1448,16 @@ void DiscountMenu()
                 DiscountMagazine();
                 break;
 
+            case "3":
+                ListAllProductDiscounts();
+                break;
+
             case "0":
                 return;
 
             default:
                 Console.WriteLine(
-                    "Invalid choice."
+                    "Invalid choice. Please try again."
                 );
                 break;
         }
@@ -1239,7 +1467,9 @@ void DiscountMenu()
 void DiscountBook()
 {
     int? id =
-        ReadId("Book ID");
+        ReadId(
+            "Book ID"
+        );
 
     if (id == null)
     {
@@ -1262,13 +1492,15 @@ void DiscountBook()
         return;
     }
 
-    ShowDiscount(book);
+    ApplyDiscount(book);
 }
 
 void DiscountMagazine()
 {
     int? id =
-        ReadId("Magazine ID");
+        ReadId(
+            "Magazine ID"
+        );
 
     if (id == null)
     {
@@ -1279,9 +1511,10 @@ void DiscountMagazine()
     }
 
     Magazine? magazine =
-        magazineService.GetMagazineById(
-            id.Value
-        );
+        magazineService
+            .GetMagazineById(
+                id.Value
+            );
 
     if (magazine == null)
     {
@@ -1291,32 +1524,162 @@ void DiscountMagazine()
         return;
     }
 
-    ShowDiscount(magazine);
+    ApplyDiscount(magazine);
 }
 
-void ShowDiscount(Product product)
+void ApplyDiscount(
+    Product product)
 {
-    decimal discountedPrice =
-        discountService
-            .CalculateDiscountedPrice(
-                product
-            );
+    Console.WriteLine();
+    Console.WriteLine(
+        product.GetDetails()
+    );
+    Console.WriteLine();
+
+    decimal? percentage =
+        ReadDiscountPercentage();
+
+    if (percentage == null)
+    {
+        Console.WriteLine(
+            "Discount cancelled."
+        );
+        return;
+    }
+
+    product.DiscountPercentage =
+        percentage.Value;
+
+    decimal finalPrice =
+        CalculateFinalPrice(
+            product
+        );
 
     Console.WriteLine();
-    Console.WriteLine(product.GetDetails());
 
-    Console.WriteLine();
     Console.WriteLine(
         $"Original Price : RM {product.Price:F2}"
     );
 
     Console.WriteLine(
-        "Discount       : 10%"
+        $"Discount       : {product.DiscountPercentage:0.##}%"
     );
 
     Console.WriteLine(
-        $"Final Price    : RM {discountedPrice:F2}"
+        $"Final Price    : RM {finalPrice:F2}"
     );
+
+    Console.WriteLine();
+
+    Console.WriteLine(
+        "Discount applied successfully."
+    );
+}
+
+void ListAllProductDiscounts()
+{
+    Console.WriteLine(
+        "===== All Product Discounts ====="
+    );
+
+    List<Product> products =
+        new();
+
+    products.AddRange(
+        bookService.GetAllBooks()
+    );
+
+    products.AddRange(
+        magazineService
+            .GetAllMagazines()
+    );
+
+    List<Product> discountedProducts =
+        products
+            .Where(
+                product =>
+                    product.DiscountPercentage > 0
+            )
+            .ToList();
+
+    if (discountedProducts.Count == 0)
+    {
+        Console.WriteLine(
+            "No product discounts found."
+        );
+        return;
+    }
+
+    foreach (Product product in discountedProducts)
+    {
+        decimal finalPrice =
+            CalculateFinalPrice(
+                product
+            );
+
+        Console.WriteLine();
+
+        Console.WriteLine(
+            $"Type           : {product.GetType().Name}"
+        );
+
+        Console.WriteLine(
+            $"ID             : {product.Id}"
+        );
+
+        Console.WriteLine(
+            $"Title          : {product.Title}"
+        );
+
+        Console.WriteLine(
+            $"Original Price : RM {product.Price:F2}"
+        );
+
+        Console.WriteLine(
+            $"Discount       : {product.DiscountPercentage:0.##}%"
+        );
+
+        Console.WriteLine(
+            $"Final Price    : RM {finalPrice:F2}"
+        );
+
+        Console.WriteLine(
+            "------------------------------"
+        );
+    }
+}
+
+decimal CalculateFinalPrice(
+    Product product)
+{
+    IDiscountStrategy strategy;
+
+    if (product.DiscountPercentage == 0)
+    {
+        strategy =
+            new NoDiscountStrategy();
+    }
+    else
+    {
+        decimal discountRate =
+            product.DiscountPercentage
+            / 100m;
+
+        strategy =
+            new PercentageDiscountStrategy(
+                discountRate
+            );
+    }
+
+    DiscountService discountService =
+        new DiscountService(
+            strategy
+        );
+
+    return discountService
+        .CalculateDiscountedPrice(
+            product
+        );
 }
 
 string? ReadRequiredText(
@@ -1325,7 +1688,7 @@ string? ReadRequiredText(
     while (true)
     {
         Console.Write(
-            $"{fieldName} : "
+            $"{fieldName,-LabelWidth}: "
         );
 
         string value =
@@ -1355,7 +1718,7 @@ string? ReadISBN(
     while (true)
     {
         Console.Write(
-            $"{fieldName} : "
+            $"{fieldName,-LabelWidth}: "
         );
 
         string value =
@@ -1387,7 +1750,7 @@ decimal? ReadPrice(
     while (true)
     {
         Console.Write(
-            $"{fieldName} : "
+            $"{fieldName,-LabelWidth}: "
         );
 
         string input =
@@ -1420,7 +1783,7 @@ int? ReadStock(
     while (true)
     {
         Console.Write(
-            $"{fieldName} : "
+            $"{fieldName,-LabelWidth}: "
         );
 
         string input =
@@ -1453,7 +1816,7 @@ int? ReadPositiveInt(
     while (true)
     {
         Console.Write(
-            $"{fieldName} : "
+            $"{fieldName,-LabelWidth}: "
         );
 
         string input =
@@ -1485,8 +1848,11 @@ DateOnly? ReadDate(
 {
     while (true)
     {
+        string label =
+            $"{fieldName} (yyyy-MM-dd)";
+
         Console.Write(
-            $"{fieldName} (yyyy-MM-dd) : "
+            $"{label,-LabelWidth}: "
         );
 
         string input =
@@ -1497,9 +1863,16 @@ DateOnly? ReadDate(
             return null;
         }
 
-        if (!DateOnly.TryParse(
-            input,
-            out DateOnly date))
+        bool valid =
+            DateOnly.TryParseExact(
+                input,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateOnly date
+            );
+
+        if (!valid)
         {
             Console.WriteLine(
                 "Invalid date. Please use yyyy-MM-dd."
@@ -1511,12 +1884,13 @@ DateOnly? ReadDate(
     }
 }
 
-int? ReadId(string fieldName)
+int? ReadId(
+    string fieldName)
 {
     while (true)
     {
         Console.Write(
-            $"{fieldName} : "
+            $"{fieldName,-LabelWidth}: "
         );
 
         string input =
@@ -1543,12 +1917,52 @@ int? ReadId(string fieldName)
     }
 }
 
+decimal? ReadDiscountPercentage()
+{
+    while (true)
+    {
+        const string label =
+            "Discount Percentage (0-100)";
+
+        Console.Write(
+            $"{label,-LabelWidth}: "
+        );
+
+        string input =
+            Console.ReadLine() ?? "";
+
+        if (IsCancel(input))
+        {
+            return null;
+        }
+
+        if (!decimal.TryParse(
+                input,
+                out decimal percentage)
+            ||
+            percentage < 0
+            ||
+            percentage > 100)
+        {
+            Console.WriteLine(
+                "Invalid discount. Please enter a number from 0 to 100."
+            );
+            continue;
+        }
+
+        return percentage;
+    }
+}
+
 bool ConfirmDelete()
 {
     while (true)
     {
+        const string label =
+            "Confirm delete (Y/N/C)";
+
         Console.Write(
-            "Confirm delete (Y/N/C): "
+            $"{label,-LabelWidth}: "
         );
 
         string confirmation =
@@ -1576,7 +1990,8 @@ bool ConfirmDelete()
     }
 }
 
-bool IsCancel(string input)
+bool IsCancel(
+    string input)
 {
     return input.Equals(
         "C",
