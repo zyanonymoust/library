@@ -71,6 +71,32 @@ public class BookService
         return true;
     }
 
+    public bool DecreaseStock(int bookId, int quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new ArgumentException("Quantity must be greater than zero.");
+        }
+
+        Book? book = _repository.GetById(bookId);
+
+        if (book == null)
+        {
+            return false;
+        }
+
+        if (quantity > book.Stock)
+        {
+            throw new InvalidOperationException("Not enough stock available.");
+        }
+
+        book.Stock -= quantity;
+
+        _repository.Update(book);
+
+        return true;
+    }
+
     private static void ValidateBook(Book book)
     {
         if (string.IsNullOrWhiteSpace(book.Title))
@@ -108,4 +134,6 @@ public class BookService
             );
         }
     }
+
 }
+

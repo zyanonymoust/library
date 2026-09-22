@@ -80,3 +80,20 @@ The system can store both Book and Magazine objects using:
 
 ```csharp
 List<Product>
+
+## Automated Testing
+
+The project includes an xUnit test project with tests covering:
+
+- Valid stock decrement
+- Stock reaching zero
+- Negative quantity validation
+- Quantity greater than available stock
+- Empty book title validation
+- Repository update verification using Moq
+- In-memory repository add/retrieve behavior
+
+A sanity-check was also performed by intentionally changing the stock decrement logic from:
+
+```csharp
+book.Stock -= quantity;
