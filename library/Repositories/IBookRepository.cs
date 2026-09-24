@@ -15,4 +15,9 @@ public interface IBookRepository
     void Update(Book book);
 
     void Delete(int id);
+
+    List<Book> GetLowStockBooks(int threshold);
+
+    List<Book> GetMostExpensiveBooks(int count);
+
 }
