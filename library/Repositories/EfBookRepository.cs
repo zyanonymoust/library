@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace library.Repositories;
 
-public class EfBookRepositories : IBookRepository 
+public class EfBookRepository : IBookRepository 
 {
     private readonly BookstoreDbContext _db;
 
-    public EfBookRepositories(BookstoreDbContext db)
+    public EfBookRepository(BookstoreDbContext db)
     {
         _db = db;
     }

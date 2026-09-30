@@ -1,11 +1,23 @@
 ﻿using System.Globalization;
+using library.Data;
 using library.Models;
 using library.Repositories;
 using library.Services;
 using library.Strategies;
+using Microsoft.EntityFrameworkCore;
+
+DbContextOptions<BookstoreDbContext> dbOptions =
+    new DbContextOptionsBuilder<BookstoreDbContext>()
+        .UseSqlite("Data Source=bookstore.db")
+        .Options;
+
+using BookstoreDbContext dbContext =
+    new BookstoreDbContext(dbOptions);
+
+dbContext.Database.Migrate();
 
 IBookRepository bookRepository =
-    new InMemoryBookRepository();
+    new EfBookRepository(dbContext);
 
 BookService bookService =
     new BookService(bookRepository);
@@ -74,6 +86,8 @@ void BookMenu()
         Console.WriteLine("3. Update Book");
         Console.WriteLine("4. Delete Book");
         Console.WriteLine("5. Search Book");
+        Console.WriteLine("6. Low Stock Report");
+        Console.WriteLine("7. Most Expensive Books");
         Console.WriteLine("0. Back");
         Console.Write("Enter your choice: ");
 
@@ -101,6 +115,14 @@ void BookMenu()
 
             case "5":
                 SearchBook();
+                break;
+
+            case "6":
+                ShowLowStockBooks();
+                break;
+
+            case "7":
+                ShowMostExpensiveBooks();
                 break;
 
             case "0":
@@ -196,6 +218,7 @@ void AddBook()
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     string? title =
@@ -299,6 +322,7 @@ void UpdateBook()
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     int? id =
@@ -616,9 +640,11 @@ void DeleteBook()
     Console.WriteLine(
         "===== Delete Book ====="
     );
+
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     int? id =
@@ -687,9 +713,11 @@ void SearchBook()
     Console.WriteLine(
         "===== Search Book ====="
     );
+
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     while (true)
@@ -786,9 +814,11 @@ void AddMagazine()
     Console.WriteLine(
         "===== Add Magazine ====="
     );
+
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     string? title =
@@ -905,9 +935,11 @@ void UpdateMagazine()
     Console.WriteLine(
         "===== Update Magazine ====="
     );
+
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     int? id =
@@ -948,6 +980,7 @@ void UpdateMagazine()
         Console.WriteLine(
             "===== Choose What To Update ====="
         );
+
         Console.WriteLine("1. Title");
         Console.WriteLine("2. Publisher");
         Console.WriteLine("3. Issue Number");
@@ -1173,14 +1206,19 @@ void UpdateMagazine()
 
                     magazine.Title =
                         title;
+
                     magazine.Publisher =
                         publisher;
+
                     magazine.IssueNumber =
                         issueNumber.Value;
+
                     magazine.PublishedDate =
                         date.Value;
+
                     magazine.Price =
                         price.Value;
+
                     magazine.Stock =
                         stock.Value;
 
@@ -1214,7 +1252,9 @@ void UpdateMagazine()
             Console.WriteLine(
                 "Magazine updated successfully."
             );
+
             Console.WriteLine();
+
             Console.WriteLine(
                 magazine.GetDetails()
             );
@@ -1235,9 +1275,11 @@ void DeleteMagazine()
     Console.WriteLine(
         "===== Delete Magazine ====="
     );
+
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     int? id =
@@ -1271,6 +1313,7 @@ void DeleteMagazine()
     Console.WriteLine(
         magazine.GetDetails()
     );
+
     Console.WriteLine();
 
     if (!ConfirmDelete())
@@ -1306,9 +1349,11 @@ void SearchMagazine()
     Console.WriteLine(
         "===== Search Magazine ====="
     );
+
     Console.WriteLine(
         "Enter C at any time to cancel."
     );
+
     Console.WriteLine();
 
     while (true)
@@ -1352,6 +1397,7 @@ void SearchMagazine()
         }
 
         Console.WriteLine();
+
         Console.WriteLine(
             "===== Search Results ====="
         );
@@ -1359,9 +1405,11 @@ void SearchMagazine()
         foreach (Magazine magazine in results)
         {
             Console.WriteLine();
+
             Console.WriteLine(
                 magazine.GetDetails()
             );
+
             Console.WriteLine(
                 "------------------------------"
             );
@@ -1400,9 +1448,11 @@ void ViewAllProducts()
     foreach (Product product in products)
     {
         Console.WriteLine();
+
         Console.WriteLine(
             product.GetDetails()
         );
+
         Console.WriteLine(
             "------------------------------"
         );
@@ -1414,21 +1464,27 @@ void DiscountMenu()
     while (true)
     {
         Console.WriteLine();
+
         Console.WriteLine(
             "===== Product Discount ====="
         );
+
         Console.WriteLine(
             "1. Apply / Change Book Discount"
         );
+
         Console.WriteLine(
             "2. Apply / Change Magazine Discount"
         );
+
         Console.WriteLine(
             "3. List All Product Discounts"
         );
+
         Console.WriteLine(
             "0. Back"
         );
+
         Console.Write(
             "Enter your choice: "
         );
@@ -1531,9 +1587,11 @@ void ApplyDiscount(
     Product product)
 {
     Console.WriteLine();
+
     Console.WriteLine(
         product.GetDetails()
     );
+
     Console.WriteLine();
 
     decimal? percentage =
@@ -1997,4 +2055,110 @@ bool IsCancel(
         "C",
         StringComparison.OrdinalIgnoreCase
     );
+}
+
+void ShowLowStockBooks()
+{
+    Console.WriteLine(
+        "===== Low Stock Report ====="
+    );
+
+    Console.Write(
+        "Stock Threshold: "
+    );
+
+    string input =
+        Console.ReadLine() ?? "";
+
+    if (!int.TryParse(
+            input,
+            out int threshold)
+        ||
+        threshold < 0)
+    {
+        Console.WriteLine(
+            "Invalid stock threshold."
+        );
+        return;
+    }
+
+    List<Book> books =
+        bookService
+            .GetLowStockBooks(
+                threshold
+            );
+
+    if (books.Count == 0)
+    {
+        Console.WriteLine(
+            "No low stock books found."
+        );
+        return;
+    }
+
+    foreach (Book book in books)
+    {
+        Console.WriteLine();
+
+        Console.WriteLine(
+            book.GetDetails()
+        );
+
+        Console.WriteLine(
+            "---------------------------"
+        );
+    }
+}
+
+void ShowMostExpensiveBooks()
+{
+    Console.WriteLine(
+        "===== Most Expensive Books ====="
+    );
+
+    Console.Write(
+        "Number of Books to Display: "
+    );
+
+    string input =
+        Console.ReadLine() ?? "";
+
+    if (!int.TryParse(
+            input,
+            out int count)
+        ||
+        count <= 0)
+    {
+        Console.WriteLine(
+            "Invalid number."
+        );
+        return;
+    }
+
+    List<Book> books =
+        bookService
+            .GetMostExpensiveBooks(
+                count
+            );
+
+    if (books.Count == 0)
+    {
+        Console.WriteLine(
+            "No books found."
+        );
+        return;
+    }
+
+    foreach (Book book in books)
+    {
+        Console.WriteLine();
+
+        Console.WriteLine(
+            book.GetDetails()
+        );
+
+        Console.WriteLine(
+            "---------------------------"
+        );
+    }
 }

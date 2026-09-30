@@ -75,3 +75,4 @@ public class InMemoryMagazineRepository
         _magazines.Remove(magazine);
     }
 }
+

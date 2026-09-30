@@ -20,4 +20,6 @@ public class Book : Product
             $"Price    : RM {Price:F2}\n" +
             $"Stock    : {Stock}";
     }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

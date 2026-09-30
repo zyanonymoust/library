@@ -135,5 +135,26 @@ public class BookService
         }
     }
 
+    public List<Book> GetLowStockBooks(int threshold)
+    {
+        if (threshold < 0)
+        {
+            throw new ArgumentException(
+                "Threshold must be greater than or equal to zero."
+            );
+        }
+        return _repository.GetLowStockBooks(threshold);
+    }
+
+    public List<Book> GetMostExpensiveBooks(int count)
+    {
+        if (count <= 0)
+        {
+            throw new ArgumentException(
+                "Count must be greater than zero."
+            );
+        }
+        return _repository.GetMostExpensiveBooks(count);
+    }
 }
 

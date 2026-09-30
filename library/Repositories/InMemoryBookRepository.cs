@@ -35,14 +35,12 @@ public class InMemoryBookRepository
                 book =>
                     book.Title.Contains(
                         keyword,
-                        StringComparison
-                            .OrdinalIgnoreCase
+                        StringComparison.OrdinalIgnoreCase
                     )
                     ||
                     book.ISBN.Contains(
                         keyword,
-                        StringComparison
-                            .OrdinalIgnoreCase
+                        StringComparison.OrdinalIgnoreCase
                     )
             )
             .OrderBy(
@@ -65,8 +63,7 @@ public class InMemoryBookRepository
         int index =
             _books.FindIndex(
                 existingBook =>
-                    existingBook.Id ==
-                    book.Id
+                    existingBook.Id == book.Id
             );
 
         if (index == -1)
