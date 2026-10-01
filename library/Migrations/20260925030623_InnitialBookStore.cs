@@ -4,10 +4,8 @@
 
 namespace library.Migrations
 {
-    /// <inheritdoc />
     public partial class InnitialBookStore : Migration
     {
-        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
@@ -36,7 +34,6 @@ namespace library.Migrations
                 unique: true);
         }
 
-        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
