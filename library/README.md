@@ -1,398 +1,199 @@
-# Library Management System
+## ASP.NET Core Web API
 
-A C# .NET Console Application that demonstrates Object-Oriented Programming (OOP), automated testing, Entity Framework Core, SQLite, and LINQ using a Library Management System.
+The Library Management System was extended with an ASP.NET Core Web API to expose the existing Book system over HTTP.
 
-The project supports Book and Magazine management, Repository Pattern, polymorphism, Strategy Pattern for product discounts, automated testing, and persistent Book storage using SQLite.
+### API Architecture
 
-## Objective
+- Added a new `Library.API` project.
+- Used Controllers instead of Minimal APIs.
+- Controllers were chosen to keep the HTTP layer separate from the existing Service and Repository layers.
+- Business logic remains inside `BookService`.
+- Database access continues through `IBookRepository`, `EfBookRepository`, and `BookstoreDbContext`.
 
-The objective of this project is to structure a working Library Management System using OOP principles instead of placing all logic directly inside `Program.cs`.
-
-The project demonstrates:
-
-- Abstraction
-- Encapsulation
-- Inheritance
-- Polymorphism
-- Repository Pattern
-- Strategy Pattern
-- Separation of responsibilities
-- Automated Testing
-- Entity Framework Core
-- SQLite
-- Database Migrations
-- LINQ
-
-## Features
-
-### Book Management
-
-- List all books
-- Add book
-- Update book
-- Delete book
-- Search book by Title or ISBN
-- Automatic Book ID generation
-- Input validation
-- Cancel operation using `C`
-- Persistent storage using SQLite
-- Low Stock Report
-- Most Expensive Books
-
-Book fields:
-
-- ID
-- Title
-- Author
-- ISBN
-- Category
-- Price
-- Stock
-- Created At
-
-### Magazine Management
-
-- List all magazines
-- Add magazine
-- Update magazine
-- Delete magazine
-- Search magazine by Title or Publisher
-- Automatic Magazine ID generation
-- Input validation
-- Cancel operation using `C`
-
-Magazine fields:
-
-- ID
-- Title
-- Publisher
-- Issue Number
-- Published Date
-- Price
-- Stock
-
-Magazine management currently uses an in-memory repository.
-
-## Product Management
-
-Both `Book` and `Magazine` inherit from the abstract `Product` class.
-
-Common properties are stored in `Product`:
-
-- ID
-- Title
-- Price
-- Stock
-- Discount Percentage
-
-This avoids unnecessary duplicated properties.
-
-The system can store both Book and Magazine objects using:
-
-```csharp
-List<Product>
-```
-
-This demonstrates polymorphism because both `Book` and `Magazine` can be handled using the same `Product` type.
-
-## Repository Pattern
-
-The project uses the Repository Pattern to separate data storage from business logic.
-
-Book repositories:
-
-- `IBookRepository`
-- `InMemoryBookRepository`
-- `EfBookRepository`
-
-Magazine repositories:
-
-- `IMagazineRepository`
-- `InMemoryMagazineRepository`
-
-`BookService` depends on the `IBookRepository` interface instead of directly depending on a specific repository implementation.
-
-This allows Book storage to change from in-memory storage to EF Core and SQLite without rewriting the main Book business logic.
-
-## Strategy Pattern
-
-The Strategy Pattern is used for product discounts.
-
-Discount strategies:
-
-- `IDiscountStrategy`
-- `NoDiscountStrategy`
-- `PercentageDiscountStrategy`
-
-The system allows users to:
-
-- Apply a Book discount
-- Apply a Magazine discount
-- Change a discount percentage
-- View discounted products
-- Calculate the final price
-
-## Automated Testing
-
-The project includes automated testing using xUnit and Moq.
-
-Tests cover:
-
-- Valid stock decrement
-- Stock reaching zero
-- Negative quantity validation
-- Quantity greater than available stock
-- Empty Book title validation
-- Repository update verification using Moq
-- In-memory repository add and retrieve behavior
-
-Current test result:
-
-- 7 Passed
-- 0 Failed
-
-A sanity check was also performed by intentionally changing the stock decrement logic from:
-
-```csharp
-book.Stock -= quantity;
-```
-
-to:
-
-```csharp
-book.Stock += quantity;
-```
-
-The tests detected the incorrect logic.
-
-After restoring the correct code, all tests passed again.
-
-## EF Core and SQLite
-
-Book storage was upgraded from in-memory storage to Entity Framework Core with SQLite.
-
-The project now includes:
-
-- `BookstoreDbContext`
-- `EfBookRepository`
-- SQLite database using `bookstore.db`
-- Persistent Book storage
-- Existing `IBookRepository` interface
-- Existing `BookService` business logic
-
-Current Book data flow:
+Current API flow:
 
 ```text
-Console
-↓
+Swagger / HTTP Client
+        ↓
+BooksController / OrdersController
+        ↓
 BookService
-↓
+        ↓
 IBookRepository
-↓
+        ↓
 EfBookRepository
-↓
+        ↓
 BookstoreDbContext
-↓
+        ↓
 Entity Framework Core
-↓
+        ↓
 SQLite
-↓
+        ↓
 bookstore.db
 ```
 
-Book data is now stored in SQLite instead of temporary in-memory storage.
+## API Endpoints
 
-Magazine management continues to use `InMemoryMagazineRepository`.
+### Books
 
-## Database Migrations
+- `GET /books`
+  - Returns all Books.
+  - Success response: `200 OK`.
 
-Entity Framework Core migrations are used to manage database structure changes.
+- `GET /books/{id}`
+  - Returns one Book by ID.
+  - Success response: `200 OK`.
+  - Invalid ID response: `400 Bad Request`.
+  - Book not found response: `404 Not Found`.
 
-Current migrations:
+- `POST /books`
+  - Creates a new Book.
+  - Success response: `201 Created`.
+  - Invalid input response: `400 Bad Request`.
 
-- `InitialBookStore`
-  - Creates the initial Book database structure
+- `PUT /books/{id}`
+  - Updates an existing Book.
+  - Success response: `200 OK`.
+  - Invalid ID response: `400 Bad Request`.
+  - Book not found response: `404 Not Found`.
 
-- `AddBookCreatedAt`
-  - Adds the `CreatedAt` field
+- `DELETE /books/{id}`
+  - Deletes an existing Book.
+  - Success response: `200 OK`.
+  - Invalid ID response: `400 Bad Request`.
+  - Book not found response: `404 Not Found`.
 
-The migrations were successfully applied to the SQLite database.
+### Orders
 
-The migration files are included in the Git repository.
+- `POST /orders`
+  - Creates an Order using `BookId` and `Quantity`.
+  - Reduces the Book stock through `BookService`.
+  - Success response: `201 Created`.
+  - Invalid quantity response: `400 Bad Request`.
+  - Insufficient stock response: `400 Bad Request`.
+  - Book not found response: `404 Not Found`.
 
-Migration status can be checked using:
+Example request:
 
-```powershell
-Get-Migration -Context BookstoreDbContext
+```json
+{
+  "bookId": 2,
+  "quantity": 3
+}
 ```
 
-The database can be updated using:
+Example successful response:
 
-```powershell
-Update-Database -Context BookstoreDbContext
+```json
+{
+  "message": "Order created successfully.",
+  "bookId": 2,
+  "quantity": 3,
+  "remainingStock": 4
+}
 ```
 
-## Data Persistence
+## HTTP Status Codes
 
-Book data is stored inside:
+The API uses different HTTP status codes depending on the result:
+
+- `200 OK`
+  - Successful GET, PUT, or DELETE operation.
+
+- `201 Created`
+  - New Book or Order successfully created.
+
+- `400 Bad Request`
+  - Invalid Book ID.
+  - Empty Book title.
+  - Invalid Order quantity.
+  - Insufficient Book stock.
+
+- `404 Not Found`
+  - Requested Book does not exist.
+
+## Input Validation
+
+The API validates user input before completing operations.
+
+Validation includes:
+
+- Book ID must be greater than `0`.
+- Book title cannot be empty.
+- Required Book fields must contain valid values.
+- Order quantity must be greater than `0`.
+- Order quantity cannot exceed available stock.
+- Requested Book must exist.
+
+Validation errors return a clear response message that the client can act on.
+
+Examples:
+
+```json
+{
+  "message": "Book not found."
+}
+```
+
+```json
+{
+  "message": "Quantity must be greater than 0."
+}
+```
+
+```json
+{
+  "message": "Not enough stock available."
+}
+```
+
+## Swagger and OpenAPI
+
+- Swagger UI is enabled for API documentation and testing.
+- OpenAPI describes the available API endpoints.
+- Swagger allows GET, POST, PUT, and DELETE requests to be tested directly from the browser.
+- Swagger displays request bodies, response bodies, and HTTP status codes.
+
+Swagger includes:
 
 ```text
-bookstore.db
+GET    /books
+GET    /books/{id}
+POST   /books
+PUT    /books/{id}
+DELETE /books/{id}
+POST   /orders
 ```
 
-Persistence was tested by:
+## API Validation Testing
 
-- Adding a Book
-- Listing all Books
-- Closing the application
-- Running the application again
-- Listing all Books again
-- Confirming the previously added Book still exists
+The following API scenarios were tested using Swagger:
 
-This confirms that Book data is no longer lost when the application closes.
+- `GET /books` → `200 OK`
+- Valid `POST /books` → `201 Created`
+- Invalid `POST /books` → `400 Bad Request`
+- Existing `GET /books/{id}` → `200 OK`
+- Missing Book → `404 Not Found`
+- Invalid Book ID → `400 Bad Request`
+- Valid `PUT /books/{id}` → `200 OK`
+- Valid `DELETE /books/{id}` → `200 OK`
+- Valid `POST /orders` → `201 Created`
+- Insufficient stock → `400 Bad Request`
+- Invalid Order quantity → `400 Bad Request`
+- Order with missing Book → `404 Not Found`
 
-Book operations stored in SQLite include:
-
-- Add
-- Read
-- Update
-- Delete
-
-## LINQ Queries
-
-The project includes LINQ queries beyond basic CRUD operations.
-
-### Low Stock Report
-
-- User enters a stock threshold
-- Displays Books with stock less than or equal to the threshold
-- Uses `Where()`
-- Uses `OrderBy()`
-- Uses `ThenBy()`
-
-Example:
-
-```csharp
-.Where(book => book.Stock <= threshold)
-.OrderBy(book => book.Stock)
-.ThenBy(book => book.Title)
-```
-
-### Most Expensive Books
-
-- User enters the number of Books to display
-- Sorts Books from highest to lowest price
-- Returns the requested number of results
-- Uses `OrderByDescending()`
-- Uses `ThenBy()`
-- Uses `Take()`
-
-Example:
-
-```csharp
-.OrderByDescending(book => book.Price)
-.ThenBy(book => book.Title)
-.Take(count)
-```
-
-## Current Storage
-
-- Book → `EfBookRepository`
-- Book database → SQLite
-- Database file → `bookstore.db`
-- Database context → `BookstoreDbContext`
-- Repository interface → `IBookRepository`
-- Book service → `BookService`
-- Magazine → `InMemoryMagazineRepository`
-
-## Project Structure
+## Current API Structure
 
 ```text
-library
-├── Data
-│   └── BookstoreDbContext.cs
+Library.API
+├── Controllers
+│   ├── BooksController.cs
+│   └── OrdersController.cs
 │
-├── Migrations
-│   ├── InitialBookStore
-│   ├── AddBookCreatedAt
-│   └── BookstoreDbContextModelSnapshot.cs
-│
-├── Models
-│   ├── Product.cs
-│   ├── Book.cs
-│   └── Magazine.cs
-│
-├── Repositories
-│   ├── IBookRepository.cs
-│   ├── InMemoryBookRepository.cs
-│   ├── EfBookRepository.cs
-│   ├── IMagazineRepository.cs
-│   └── InMemoryMagazineRepository.cs
-│
-├── Services
-│   ├── BookService.cs
-│   ├── MagazineService.cs
-│   └── DiscountService.cs
-│
-├── Strategies
-│   ├── IDiscountStrategy.cs
-│   ├── NoDiscountStrategy.cs
-│   └── PercentageDiscountStrategy.cs
+├── DTOs
+│   └── OrderRequest.cs
 │
 ├── Program.cs
-├── bookstore.db
-└── README.md
+├── appsettings.json
+└── Library.API.http
 ```
-
-## Technologies Used
-
-- C#
-- .NET
-- Visual Studio
-- Object-Oriented Programming
-- Entity Framework Core
-- SQLite
-- LINQ
-- xUnit
-- Moq
-- Git
-- GitHub
-
-## Running the Application
-
-- Open the solution in Visual Studio
-- Build the solution
-- Run the `library` project
-- Select an option from the console menu
-
-Pending EF Core migrations are automatically checked when the application starts.
-
-## Running Automated Tests
-
-- Open Test Explorer
-- Select `Run All`
-- Check the test results
-
-Current result:
-
-```text
-7 Passed
-0 Failed
-```
-
-## Summary
-
-The Library Management System demonstrates:
-
-- Object-Oriented Programming
-- Repository Pattern
-- Strategy Pattern
-- Polymorphism
-- Automated Testing
-- Entity Framework Core
-- SQLite Persistent Storage
-- Incremental Database Migrations
-- LINQ Queries
-- Separation of Responsibilities
-
-The Book storage implementation was successfully changed from `InMemoryBookRepository` to `EfBookRepository` while keeping `BookService` dependent on the same `IBookRepository` interface.
