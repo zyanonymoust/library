@@ -1,4 +1,4 @@
-**Library Management System**
+Library Management System
 A C# .NET Console Application and ASP.NET Core Web API that demonstrates Object-Oriented Programming (OOP), automated testing, Entity Framework Core, SQLite, LINQ, and HTTP API development using a Library Management System.
 The project supports Book and Magazine management, Repository Pattern, polymorphism, Strategy Pattern for product discounts, automated testing, persistent Book storage using SQLite, and HTTP endpoints exposed through ASP.NET Core Web API.
 Objective
