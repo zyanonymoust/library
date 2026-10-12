@@ -1,6 +1,7 @@
 ﻿using Library.API.DTOs;
 using library.Models;
 using library.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Library.API.Controllers;
@@ -10,13 +11,16 @@ namespace Library.API.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly BookService _bookService;
+    private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(BookService bookService)
+    public OrdersController(BookService bookService, ILogger<OrdersController> logger)
     {
         _bookService = bookService;
+        _logger = logger;
     }
 
     [HttpPost]
+    [Authorize]
     public IActionResult CreateOrder(OrderRequest request)
     {
         if (request.BookId <= 0)
@@ -42,6 +46,12 @@ public class OrdersController : ControllerBase
 
             Book? updateBook = _bookService.GetBookById(request.BookId);
 
+            _logger.LogInformation(
+                "Order created for book {BookId} with quantity {Quantity}; remaining stock {RemainingStock}",
+                request.BookId,
+                request.Quantity,
+                updateBook?.Stock);
+
             return StatusCode(StatusCodes.Status201Created, new 
             { 
                 message = "Order created successfully.", 
@@ -53,11 +63,13 @@ public class OrdersController : ControllerBase
 
         catch (ArgumentException ex)
         {
+            _logger.LogWarning("Order for book {BookId} rejected: {Reason}", request.BookId, ex.Message);
             return BadRequest(new { message = ex.Message });
         }
 
         catch (InvalidOperationException ex)
         {
+            _logger.LogWarning("Order for book {BookId} rejected: {Reason}", request.BookId, ex.Message);
             return BadRequest(new { message = ex.Message });
         }
     }

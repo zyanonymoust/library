@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Library.API.Security;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Library.IntegrationTests;
@@ -18,6 +19,47 @@ public sealed class LibraryApiIntegrationTests : IDisposable
             BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false
         });
+        _client.DefaultRequestHeaders.Add(ApiKeyAuthenticationHandler.HeaderName, TestApiKey.Value);
+    }
+
+    [Fact]
+    public async Task WriteEndpoints_WithoutApiKey_ReturnUnauthorized()
+    {
+        using var anonymousClient = CreateAnonymousClient();
+
+        using var create = await anonymousClient.PostAsJsonAsync("/books", BookPayload(3));
+        using var order = await anonymousClient.PostAsJsonAsync("/orders", new { bookId = 1, quantity = 1 });
+        using var update = await anonymousClient.PutAsJsonAsync("/books/1", BookPayload(3));
+        using var delete = await anonymousClient.DeleteAsync("/books/1");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, create.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, order.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, update.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, delete.StatusCode);
+
+        using var list = await anonymousClient.GetAsync("/books");
+        var books = await list.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, books.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ReadEndpoint_WithoutApiKey_RemainsPublic()
+    {
+        using var anonymousClient = CreateAnonymousClient();
+        using var response = await anonymousClient.GetAsync("/books");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WriteEndpoint_WithInvalidApiKey_ReturnUnauthorized()
+    {
+        using var invalidClient = CreateAnonymousClient();
+        invalidClient.DefaultRequestHeaders.Add(ApiKeyAuthenticationHandler.HeaderName, "incorrect-api-key");
+
+        using var response = await invalidClient.PostAsJsonAsync("/books", BookPayload(3));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
@@ -113,6 +155,12 @@ public sealed class LibraryApiIntegrationTests : IDisposable
         title, author = "Test Author", isbn = "9781234567890",
         category = "Programming", price = 25m, stock
     };
+
+    private HttpClient CreateAnonymousClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions
+    {
+        BaseAddress = new Uri("https://localhost"),
+        AllowAutoRedirect = false
+    });
 
     private async Task<int> CreateBook(int stock)
     {

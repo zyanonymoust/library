@@ -1,5 +1,6 @@
 ﻿using library.Models;
 using library.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Library.API.Controllers;
@@ -9,10 +10,12 @@ namespace Library.API.Controllers;
 public class BooksController : ControllerBase
 {
     private readonly BookService _bookService;
+    private readonly ILogger<BooksController> _logger;
 
-    public BooksController(BookService bookService)
+    public BooksController(BookService bookService, ILogger<BooksController> logger)
     {
         _bookService = bookService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -45,12 +48,14 @@ public class BooksController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public IActionResult AddBook(
         Book book)
     {
         try
         {
             _bookService.AddBook(book);
+            _logger.LogInformation("Book {BookId} created", book.Id);
 
             return CreatedAtAction(
                 nameof(GetBookById),
@@ -59,6 +64,7 @@ public class BooksController : ControllerBase
 
         catch (ArgumentException ex)
         {
+            _logger.LogWarning("Book creation rejected: {Reason}", ex.Message);
             return BadRequest(
                 new {message = ex.Message}
             );
@@ -66,6 +72,7 @@ public class BooksController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize]
     public IActionResult UpdateBook(int id, Book updatedBook)
     {
         if (id <= 0)
@@ -101,11 +108,13 @@ public class BooksController : ControllerBase
                     new {message = "Book not found."}
                 );
             }
+            _logger.LogInformation("Book {BookId} updated", id);
             return Ok(existingBook);
         }
 
         catch (ArgumentException ex)
         {
+            _logger.LogWarning("Book {BookId} update rejected: {Reason}", id, ex.Message);
             return BadRequest(
                 new {message = ex.Message}
             );
@@ -113,6 +122,7 @@ public class BooksController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize]
     public IActionResult DeleteBook(
         int id)
     {
@@ -131,6 +141,8 @@ public class BooksController : ControllerBase
                 new {message = "Book not found."}
             );
         }
+
+        _logger.LogInformation("Book {BookId} deleted", id);
 
         return Ok(
             new {message = "Book deleted successfully."}

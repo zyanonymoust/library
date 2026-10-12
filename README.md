@@ -147,6 +147,46 @@ Examples:
 }
 ```
 
+## API key authentication
+
+Read-only `GET` endpoints remain public. Write endpoints (`POST`, `PUT`, and `DELETE` under `/books`, and `POST /orders`) require an API key in the `X-API-Key` request header. Requests with no key or an incorrect key receive `401 Unauthorized`.
+
+The API key is loaded from configuration at `Authentication:ApiKey`. Do not put a real key in `appsettings*.json`, source code, screenshots, or Git. The application requires a key of at least 32 characters when it starts.
+
+### Local development
+
+Use .NET User Secrets to keep a development key outside the repository. In PowerShell, from the repository folder, generate a random key and save it locally:
+
+```powershell
+$apiKey = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+dotnet user-secrets set "Authentication:ApiKey" $apiKey --project Library.API
+dotnet run --project Library.API
+```
+
+When calling a write endpoint, send the key as the `X-API-Key` header. Keep the PowerShell variable for the current session, and do not paste the key into source files or commit it.
+
+### Production configuration
+
+ASP.NET Core loads `appsettings.Production.json` when `ASPNETCORE_ENVIRONMENT` is `Production`. Set the secret through the hosting provider's secret manager or environment variable; the environment variable name for this setting is `Authentication__ApiKey`. For example, in PowerShell:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Production"
+$env:Authentication__ApiKey = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+dotnet run --project Library.API
+```
+
+This generates a new key for the current PowerShell session; a real deployment should store a stable, unique value in its secret manager. Development and production have separate logging levels: development shows more ASP.NET request detail, while production keeps framework logs at warning level and application event logs at information level. SQL command logging is suppressed in both environments to avoid noisy output and accidental data exposure.
+
+### Authentication and logging checks
+
+The integration tests verify that anonymous and invalid-key writes receive `401`, that anonymous reads still work, and that a valid key permits the existing create/order flows. Structured `ILogger` events record book and order operations and rejected requests. They never include the API key.
+
+Run the suite from the repository folder with:
+
+```powershell
+dotnet test library.slnx --configuration Release
+```
+
 ## Swagger and OpenAPI
 
 - Swagger UI is enabled for API documentation and testing.
