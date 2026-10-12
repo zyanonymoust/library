@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace Library.API.Security;
@@ -26,6 +27,13 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<Authenti
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // Authentication middleware invokes this handler for public endpoints too.
+        // Skip those endpoints so normal anonymous reads do not create misleading warnings.
+        if (Context.GetEndpoint()?.Metadata.GetMetadata<IAuthorizeData>() is null)
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         if (!Request.Headers.TryGetValue(HeaderName, out var values) || values.Count != 1)
         {
             Logger.LogWarning(
