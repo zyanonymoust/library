@@ -197,3 +197,17 @@ Library.API
 ├── appsettings.json
 └── Library.API.http
 ```
+
+## Automated integration tests and CI
+
+GitHub Actions runs the solution tests on every push and pull request using `.github/workflows/dotnet-tests.yml`. It restores packages, builds in Release mode, runs `dotnet test`, and uploads the TRX test report. A failing test exits non-zero and fails the workflow check.
+
+The integration suite uses `WebApplicationFactory<Program>` to exercise the real HTTP API with isolated SQLite in-memory databases. Its 10 cases cover creating a book, ordering it and confirming stock changes from 10 to 8 on a separate request, insufficient stock, invalid quantities and IDs, missing books, empty titles, and deleting a book. The repository also has 7 unit tests.
+
+### Verified CI evidence
+
+- **Passing run:** [Run #4 — Re-back](https://github.com/zyanonymoust/library/actions/runs/38191702518) — 7 unit tests and 10 integration tests passed (17 total).
+- **Intentional failure:** [Run #3 — Test CI detect a broken assertion](https://github.com/zyanonymoust/library/actions/runs/38191323555) — changing the persisted stock assertion from 8 to 9 caused the test step to fail with expected 9 and actual 8. The assertion was restored and pushed in Run #4.
+- **Earlier implementation defect:** [Run #1](https://github.com/zyanonymoust/library/actions/runs/38189507543) exposed an invalid book ID in the initial test. The test was corrected before the passing and intentional-failure evidence above.
+
+For full verification notes and the screenshot checklist, see [docs/CI-SUBMISSION.md](docs/CI-SUBMISSION.md).
