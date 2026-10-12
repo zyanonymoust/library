@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: dotnet build library.slnx --configuration Release --no-restore
       - name: Test
-        run: dotnet test library.slnx --configuration Release --no-build --logger "trx;LogFileName=tests.trx" --results-directory TestResults
+        run: dotnet test library.slnx --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=tests.trx" --results-directory TestResults
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

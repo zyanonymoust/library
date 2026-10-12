@@ -179,7 +179,7 @@ This generates a new key for the current PowerShell session; a real deployment s
 
 ### Authentication and logging checks
 
-The integration tests verify that anonymous and invalid-key writes receive `401`, that anonymous reads still work, and that a valid key permits the existing create/order flows. Structured `ILogger` events record book and order operations and rejected requests. They never include the API key.
+The integration tests verify that anonymous and invalid-key writes receive `401`, that anonymous reads still work, and that a valid key permits the existing create/order flows. Structured `ILogger` events record book and order operations and rejected requests. They never include the API key. GitHub Actions prints individual test names as well as saving TRX output, so the security checks are visible in the run log.
 
 Run the suite from the repository folder with:
 
