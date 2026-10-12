@@ -1,108 +1,143 @@
 using System.Net;
 using System.Net.Http.Json;
-using library.Models;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Library.IntegrationTests;
 
-public class LibraryApiIntegrationTests
-    : IClassFixture<WebApplicationFactory<Program>>
+public sealed class LibraryApiIntegrationTests : IDisposable
 {
+    // xUnit creates a new test instance (and isolated SQLite database) per case.
+    private readonly LibraryApiFactory _factory = new();
     private readonly HttpClient _client;
 
-    public LibraryApiIntegrationTests(
-        WebApplicationFactory<Program> factory)
+    public LibraryApiIntegrationTests()
     {
-        _client = factory.CreateClient();
+        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
     }
 
     [Fact]
-    public async Task CreateBook_OrderBook_StockShouldDecrease()
+    public async Task CreateBook_OrderIt_StockDecrementsAndPersists()
     {
-        string isbn =
-            DateTime.UtcNow.Ticks.ToString();
+        int id = await CreateBook(10);
+        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 2 });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var order = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(id, order.GetProperty("bookId").GetInt32());
+        Assert.Equal(2, order.GetProperty("quantity").GetInt32());
+        Assert.Equal(8, order.GetProperty("remainingStock").GetInt32());
 
-        var newBook = new
-        {
-            title = "Integration Test Book",
-            price = 50m,
-            stock = 10,
-            discountPercentage = 0m,
-            author = "Integration Author",
-            isbn = isbn,
-            category = "Testing"
-        };
+        // A separate HTTP request gets a fresh scoped DbContext, proving persistence.
+        Assert.Equal(8, await GetStock(id));
+    }
 
-        HttpResponseMessage createResponse =
-             await _client.PostAsJsonAsync(
-            "/books",
-            newBook
-        );
+    [Fact]
+    public async Task Order_InsufficientStock_RejectsWithoutChangingStock()
+    {
+        int id = await CreateBook(3);
+        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 4 });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("Not enough stock available.", error.GetProperty("message").GetString());
+        Assert.Equal(3, await GetStock(id));
+    }
 
-        string createResponseBody =
-            await createResponse.Content.ReadAsStringAsync();
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Order_InvalidQuantity_RejectsWithoutChangingStock(int quantity)
+    {
+        int id = await CreateBook(3);
+        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(3, await GetStock(id));
+    }
 
-        Assert.True(
-            createResponse.StatusCode ==
-                HttpStatusCode.Created,
-            $"Expected 201 Created but got {(int)createResponse.StatusCode} " +
-            $"{createResponse.StatusCode}. Response: {createResponseBody}"
-        );
+    [Fact]
+    public async Task Order_AllStock_ThenAnotherOrderIsRejected()
+    {
+        int id = await CreateBook(3);
+        using var first = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 3 });
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(0, await GetStock(id));
+        using var second = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 1 });
+        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
+        Assert.Equal(0, await GetStock(id));
+    }
 
-        Book? createdBook =
-            await createResponse.Content
-                .ReadFromJsonAsync<Book>();
+    [Fact]
+    public async Task Order_MissingBook_ReturnsNotFound()
+    {
+        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = 999, quantity = 1 });
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 
-        Assert.NotNull(createdBook);
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task Order_InvalidBookId_ReturnsBadRequest(int bookId)
+    {
+        using var response = await _client.PostAsJsonAsync("/orders", new { bookId, quantity = 1 });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 
-        int bookId = createdBook.Id;
+    [Fact]
+    public async Task CreateBook_EmptyTitle_RejectsWithoutSaving()
+    {
+        using var response = await _client.PostAsJsonAsync("/books", BookPayload(3, ""));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var list = await _client.GetAsync("/books");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        var books = await list.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, books.GetArrayLength());
+    }
 
-        var order = new
-        {
-            bookId = bookId,
-            quantity = 3
-        };
+    [Fact]
+    public async Task DeleteBook_ThenGetAndOrder_ReturnNotFound()
+    {
+        int id = await CreateBook(3);
+        using var deleted = await _client.DeleteAsync($"/books/{id}");
+        Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
+        using var get = await _client.GetAsync($"/books/{id}");
+        Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
+        using var order = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 1 });
+        Assert.Equal(HttpStatusCode.NotFound, order.StatusCode);
+    }
 
-        HttpResponseMessage orderResponse =
-            await _client.PostAsJsonAsync(
-                "/orders",
-                order
-            );
+    private static object BookPayload(int stock, string title = "Integration Test Book") => new
+    {
+        title, author = "Test Author", isbn = "9781234567890",
+        category = "Programming", price = 25m, stock
+    };
 
-        Assert.Equal(
-            HttpStatusCode.Created,
-            orderResponse.StatusCode
-        );
+    private async Task<int> CreateBook(int stock)
+    {
+        using var response = await _client.PostAsJsonAsync("/books", BookPayload(stock));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var book = await response.Content.ReadFromJsonAsync<JsonElement>();
+        int id = book.GetProperty("id").GetInt32();
+        Assert.True(id > 0);
+        Assert.NotNull(response.Headers.Location);
+        Assert.EndsWith($"/books/{id}", response.Headers.Location!.ToString());
+        Assert.Equal(stock, await GetStock(id));
+        return id;
+    }
 
-        HttpResponseMessage getResponse =
-            await _client.GetAsync(
-                $"/books/{bookId}"
-            );
+    private async Task<int> GetStock(int id)
+    {
+        using var response = await _client.GetAsync($"/books/{id}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var book = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return book.GetProperty("stock").GetInt32();
+    }
 
-        Assert.Equal(
-            HttpStatusCode.OK,
-            getResponse.StatusCode
-        );
-
-        Book? updatedBook =
-            await getResponse.Content
-                .ReadFromJsonAsync<Book>();
-
-        Assert.NotNull(updatedBook);
-
-        Assert.Equal(
-            7,
-            updatedBook.Stock
-        );
-
-        HttpResponseMessage deleteResponse =
-            await _client.DeleteAsync(
-                $"/books/{bookId}"
-            );
-
-        Assert.Equal(
-            HttpStatusCode.OK,
-            deleteResponse.StatusCode
-        );
+    public void Dispose()
+    {
+        _client.Dispose();
+        _factory.Dispose();
     }
 }
