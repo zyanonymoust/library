@@ -1,0 +1,814 @@
+diff --git a/Library.API/ApiAssemblyMarker.cs b/Library.API/ApiAssemblyMarker.cs
+new file mode 100644
+--- /dev/null
++++ b/Library.API/ApiAssemblyMarker.cs
+@@ -0,0 +1,4 @@
++namespace Library.API;
++
++// Public assembly marker lets WebApplicationFactory locate the API entry point.
++public sealed class ApiAssemblyMarker { }
+diff --git a/Library Tests/Library Tests.csproj b/Library Tests/Library Tests.csproj
+--- a/Library Tests/Library Tests.csproj
++++ b/Library Tests/Library Tests.csproj
+@@ -1,27 +1,29 @@
+-﻿<Project Sdk="Microsoft.NET.Sdk">
+-
+-  <PropertyGroup>
+-    <TargetFramework>net10.0</TargetFramework>
+-    <RootNamespace>Library_Tests</RootNamespace>
+-    <ImplicitUsings>enable</ImplicitUsings>
+-    <Nullable>enable</Nullable>
+-    <IsPackable>false</IsPackable>
+-  </PropertyGroup>
+-
+-  <ItemGroup>
+-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+-    <PackageReference Include="Moq" Version="4.20.72" />
+-    <PackageReference Include="xunit" Version="2.9.3" />
+-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+-  </ItemGroup>
+-
+-  <ItemGroup>
+-    <ProjectReference Include="..\library\library.csproj" />
+-  </ItemGroup>
+-
+-  <ItemGroup>
+-    <Using Include="Xunit" />
+-  </ItemGroup>
+-
+-</Project>
+\ No newline at end of file
++﻿<Project Sdk="Microsoft.NET.Sdk">
++
++  <PropertyGroup>
++    <TargetFramework>net10.0</TargetFramework>
++    <RootNamespace>Library_Tests</RootNamespace>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <Nullable>enable</Nullable>
++    <IsPackable>false</IsPackable>
++  </PropertyGroup>
++
++  <ItemGroup>
++    <PackageReference Include="coverlet.collector" Version="6.0.4" />
++    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
++    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
++    <PackageReference Include="Moq" Version="4.20.72" />
++    <PackageReference Include="xunit" Version="2.9.3" />
++    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
++  </ItemGroup>
++
++  <ItemGroup>
++    <ProjectReference Include="..\library\library.csproj" />
++    <ProjectReference Include="..\Library.API\Library.API.csproj" />
++  </ItemGroup>
++
++  <ItemGroup>
++    <Using Include="Xunit" />
++  </ItemGroup>
++
++</Project>
+\ No newline at end of file
+diff --git a/Library Tests/LibraryApiFactory.cs b/Library Tests/LibraryApiFactory.cs
+new file mode 100644
+--- /dev/null
++++ b/Library Tests/LibraryApiFactory.cs
+@@ -0,0 +1,36 @@
++using Library.API;
++using library.Data;
++using Microsoft.AspNetCore.Hosting;
++using Microsoft.AspNetCore.Mvc.Testing;
++using Microsoft.Data.Sqlite;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.EntityFrameworkCore.Infrastructure;
++using Microsoft.Extensions.DependencyInjection;
++using Microsoft.Extensions.DependencyInjection.Extensions;
++
++namespace library.Tests;
++
++public sealed class LibraryApiFactory : WebApplicationFactory<ApiAssemblyMarker>
++{
++    private readonly SqliteConnection _connection = new("Data Source=:memory:");
++
++    public LibraryApiFactory() => _connection.Open();
++
++    protected override void ConfigureWebHost(IWebHostBuilder builder)
++    {
++        builder.UseEnvironment("Testing");
++        builder.ConfigureServices(services =>
++        {
++            services.RemoveAll<BookstoreDbContext>();
++            services.RemoveAll<DbContextOptions<BookstoreDbContext>>();
++            services.RemoveAll<IDbContextOptionsConfiguration<BookstoreDbContext>>();
++            services.AddDbContext<BookstoreDbContext>(options => options.UseSqlite(_connection));
++        });
++    }
++
++    protected override void Dispose(bool disposing)
++    {
++        base.Dispose(disposing);
++        if (disposing) _connection.Dispose();
++    }
++}
+diff --git a/Library Tests/ApiIntegrationTests.cs b/Library Tests/ApiIntegrationTests.cs
+new file mode 100644
+--- /dev/null
++++ b/Library Tests/ApiIntegrationTests.cs
+@@ -0,0 +1,143 @@
++using System.Net;
++using System.Net.Http.Json;
++using System.Text.Json;
++using Microsoft.AspNetCore.Mvc.Testing;
++
++namespace library.Tests;
++
++public sealed class ApiIntegrationTests : IDisposable
++{
++    // xUnit creates a new test instance (and isolated SQLite database) per case.
++    private readonly LibraryApiFactory _factory = new();
++    private readonly HttpClient _client;
++
++    public ApiIntegrationTests()
++    {
++        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
++        {
++            BaseAddress = new Uri("https://localhost"),
++            AllowAutoRedirect = false
++        });
++    }
++
++    [Fact]
++    public async Task CreateBook_OrderIt_StockDecrementsAndPersists()
++    {
++        int id = await CreateBook(10);
++        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 2 });
++        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
++        var order = await response.Content.ReadFromJsonAsync<JsonElement>();
++        Assert.Equal(id, order.GetProperty("bookId").GetInt32());
++        Assert.Equal(2, order.GetProperty("quantity").GetInt32());
++        Assert.Equal(8, order.GetProperty("remainingStock").GetInt32());
++
++        // A separate HTTP request gets a fresh scoped DbContext, proving persistence.
++        Assert.Equal(8, await GetStock(id));
++    }
++
++    [Fact]
++    public async Task Order_InsufficientStock_RejectsWithoutChangingStock()
++    {
++        int id = await CreateBook(3);
++        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 4 });
++        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
++        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
++        Assert.Equal("Not enough stock available.", error.GetProperty("message").GetString());
++        Assert.Equal(3, await GetStock(id));
++    }
++
++    [Theory]
++    [InlineData(0)]
++    [InlineData(-1)]
++    public async Task Order_InvalidQuantity_RejectsWithoutChangingStock(int quantity)
++    {
++        int id = await CreateBook(3);
++        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity });
++        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
++        Assert.Equal(3, await GetStock(id));
++    }
++
++    [Fact]
++    public async Task Order_AllStock_ThenAnotherOrderIsRejected()
++    {
++        int id = await CreateBook(3);
++        using var first = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 3 });
++        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
++        Assert.Equal(0, await GetStock(id));
++        using var second = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 1 });
++        Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
++        Assert.Equal(0, await GetStock(id));
++    }
++
++    [Fact]
++    public async Task Order_MissingBook_ReturnsNotFound()
++    {
++        using var response = await _client.PostAsJsonAsync("/orders", new { bookId = 999, quantity = 1 });
++        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
++    }
++
++    [Theory]
++    [InlineData(0)]
++    [InlineData(-1)]
++    public async Task Order_InvalidBookId_ReturnsBadRequest(int bookId)
++    {
++        using var response = await _client.PostAsJsonAsync("/orders", new { bookId, quantity = 1 });
++        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
++    }
++
++    [Fact]
++    public async Task CreateBook_EmptyTitle_RejectsWithoutSaving()
++    {
++        using var response = await _client.PostAsJsonAsync("/books", BookPayload(3, ""));
++        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
++        using var list = await _client.GetAsync("/books");
++        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
++        var books = await list.Content.ReadFromJsonAsync<JsonElement>();
++        Assert.Equal(0, books.GetArrayLength());
++    }
++
++    [Fact]
++    public async Task DeleteBook_ThenGetAndOrder_ReturnNotFound()
++    {
++        int id = await CreateBook(3);
++        using var deleted = await _client.DeleteAsync($"/books/{id}");
++        Assert.Equal(HttpStatusCode.OK, deleted.StatusCode);
++        using var get = await _client.GetAsync($"/books/{id}");
++        Assert.Equal(HttpStatusCode.NotFound, get.StatusCode);
++        using var order = await _client.PostAsJsonAsync("/orders", new { bookId = id, quantity = 1 });
++        Assert.Equal(HttpStatusCode.NotFound, order.StatusCode);
++    }
++
++    private static object BookPayload(int stock, string title = "Integration Test Book") => new
++    {
++        title, author = "Test Author", isbn = "9781234567890",
++        category = "Programming", price = 25m, stock
++    };
++
++    private async Task<int> CreateBook(int stock)
++    {
++        using var response = await _client.PostAsJsonAsync("/books", BookPayload(stock));
++        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
++        var book = await response.Content.ReadFromJsonAsync<JsonElement>();
++        int id = book.GetProperty("id").GetInt32();
++        Assert.True(id > 0);
++        Assert.NotNull(response.Headers.Location);
++        Assert.EndsWith($"/books/{id}", response.Headers.Location!.ToString());
++        Assert.Equal(stock, await GetStock(id));
++        return id;
++    }
++
++    private async Task<int> GetStock(int id)
++    {
++        using var response = await _client.GetAsync($"/books/{id}");
++        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
++        var book = await response.Content.ReadFromJsonAsync<JsonElement>();
++        return book.GetProperty("stock").GetInt32();
++    }
++
++    public void Dispose()
++    {
++        _client.Dispose();
++        _factory.Dispose();
++    }
++}
+diff --git a/.github/workflows/dotnet-tests.yml b/.github/workflows/dotnet-tests.yml
+new file mode 100644
+--- /dev/null
++++ b/.github/workflows/dotnet-tests.yml
+@@ -0,0 +1,33 @@
++name: .NET tests
++
++on:
++  push:
++  pull_request:
++
++permissions:
++  contents: read
++
++jobs:
++  test:
++    name: Build and test
++    runs-on: ubuntu-latest
++    timeout-minutes: 15
++    steps:
++      - uses: actions/checkout@v4
++      - name: Set up .NET
++        uses: actions/setup-dotnet@v4
++        with:
++          dotnet-version: '10.0.x'
++      - name: Restore
++        run: dotnet restore library.slnx
++      - name: Build
++        run: dotnet build library.slnx --configuration Release --no-restore
++      - name: Test
++        run: dotnet test library.slnx --configuration Release --no-build --logger "trx;LogFileName=tests.trx" --results-directory TestResults
++      - name: Upload test results
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: test-results
++          path: TestResults/**/*.trx
++          if-no-files-found: warn
+diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1,199 +1,245 @@
+-## ASP.NET Core Web API
+-
+-The Library Management System was extended with an ASP.NET Core Web API to expose the existing Book system over HTTP.
+-
+-### API Architecture
+-
+-- Added a new `Library.API` project.
+-- Used Controllers instead of Minimal APIs.
+-- Controllers were chosen to keep the HTTP layer separate from the existing Service and Repository layers.
+-- Business logic remains inside `BookService`.
+-- Database access continues through `IBookRepository`, `EfBookRepository`, and `BookstoreDbContext`.
+-
+-Current API flow:
+-
+-```text
+-Swagger / HTTP Client
+-        ↓
+-BooksController / OrdersController
+-        ↓
+-BookService
+-        ↓
+-IBookRepository
+-        ↓
+-EfBookRepository
+-        ↓
+-BookstoreDbContext
+-        ↓
+-Entity Framework Core
+-        ↓
+-SQLite
+-        ↓
+-bookstore.db
+-```
+-
+-## API Endpoints
+-
+-### Books
+-
+-- `GET /books`
+-  - Returns all Books.
+-  - Success response: `200 OK`.
+-
+-- `GET /books/{id}`
+-  - Returns one Book by ID.
+-  - Success response: `200 OK`.
+-  - Invalid ID response: `400 Bad Request`.
+-  - Book not found response: `404 Not Found`.
+-
+-- `POST /books`
+-  - Creates a new Book.
+-  - Success response: `201 Created`.
+-  - Invalid input response: `400 Bad Request`.
+-
+-- `PUT /books/{id}`
+-  - Updates an existing Book.
+-  - Success response: `200 OK`.
+-  - Invalid ID response: `400 Bad Request`.
+-  - Book not found response: `404 Not Found`.
+-
+-- `DELETE /books/{id}`
+-  - Deletes an existing Book.
+-  - Success response: `200 OK`.
+-  - Invalid ID response: `400 Bad Request`.
+-  - Book not found response: `404 Not Found`.
+-
+-### Orders
+-
+-- `POST /orders`
+-  - Creates an Order using `BookId` and `Quantity`.
+-  - Reduces the Book stock through `BookService`.
+-  - Success response: `201 Created`.
+-  - Invalid quantity response: `400 Bad Request`.
+-  - Insufficient stock response: `400 Bad Request`.
+-  - Book not found response: `404 Not Found`.
+-
+-Example request:
+-
+-```json
+-{
+-  "bookId": 2,
+-  "quantity": 3
+-}
+-```
+-
+-Example successful response:
+-
+-```json
+-{
+-  "message": "Order created successfully.",
+-  "bookId": 2,
+-  "quantity": 3,
+-  "remainingStock": 4
+-}
+-```
+-
+-## HTTP Status Codes
+-
+-The API uses different HTTP status codes depending on the result:
+-
+-- `200 OK`
+-  - Successful GET, PUT, or DELETE operation.
+-
+-- `201 Created`
+-  - New Book or Order successfully created.
+-
+-- `400 Bad Request`
+-  - Invalid Book ID.
+-  - Empty Book title.
+-  - Invalid Order quantity.
+-  - Insufficient Book stock.
+-
+-- `404 Not Found`
+-  - Requested Book does not exist.
+-
+-## Input Validation
+-
+-The API validates user input before completing operations.
+-
+-Validation includes:
+-
+-- Book ID must be greater than `0`.
+-- Book title cannot be empty.
+-- Required Book fields must contain valid values.
+-- Order quantity must be greater than `0`.
+-- Order quantity cannot exceed available stock.
+-- Requested Book must exist.
+-
+-Validation errors return a clear response message that the client can act on.
+-
+-Examples:
+-
+-```json
+-{
+-  "message": "Book not found."
+-}
+-```
+-
+-```json
+-{
+-  "message": "Quantity must be greater than 0."
+-}
+-```
+-
+-```json
+-{
+-  "message": "Not enough stock available."
+-}
+-```
+-
+-## Swagger and OpenAPI
+-
+-- Swagger UI is enabled for API documentation and testing.
+-- OpenAPI describes the available API endpoints.
+-- Swagger allows GET, POST, PUT, and DELETE requests to be tested directly from the browser.
+-- Swagger displays request bodies, response bodies, and HTTP status codes.
+-
+-Swagger includes:
+-
+-```text
+-GET    /books
+-GET    /books/{id}
+-POST   /books
+-PUT    /books/{id}
+-DELETE /books/{id}
+-POST   /orders
+-```
+-
+-## API Validation Testing
+-
+-The following API scenarios were tested using Swagger:
+-
+-- `GET /books` → `200 OK`
+-- Valid `POST /books` → `201 Created`
+-- Invalid `POST /books` → `400 Bad Request`
+-- Existing `GET /books/{id}` → `200 OK`
+-- Missing Book → `404 Not Found`
+-- Invalid Book ID → `400 Bad Request`
+-- Valid `PUT /books/{id}` → `200 OK`
+-- Valid `DELETE /books/{id}` → `200 OK`
+-- Valid `POST /orders` → `201 Created`
+-- Insufficient stock → `400 Bad Request`
+-- Invalid Order quantity → `400 Bad Request`
+-- Order with missing Book → `404 Not Found`
+-
+-## Current API Structure
+-
+-```text
+-Library.API
+-├── Controllers
+-│   ├── BooksController.cs
+-│   └── OrdersController.cs
+-│
+-├── DTOs
+-│   └── OrderRequest.cs
+-│
+-├── Program.cs
+-├── appsettings.json
+-└── Library.API.http
+-```
++## ASP.NET Core Web API
++
++The Library Management System was extended with an ASP.NET Core Web API to expose the existing Book system over HTTP.
++
++### API Architecture
++
++- Added a new `Library.API` project.
++- Used Controllers instead of Minimal APIs.
++- Controllers were chosen to keep the HTTP layer separate from the existing Service and Repository layers.
++- Business logic remains inside `BookService`.
++- Database access continues through `IBookRepository`, `EfBookRepository`, and `BookstoreDbContext`.
++
++Current API flow:
++
++```text
++Swagger / HTTP Client
++        ↓
++BooksController / OrdersController
++        ↓
++BookService
++        ↓
++IBookRepository
++        ↓
++EfBookRepository
++        ↓
++BookstoreDbContext
++        ↓
++Entity Framework Core
++        ↓
++SQLite
++        ↓
++bookstore.db
++```
++
++## API Endpoints
++
++### Books
++
++- `GET /books`
++  - Returns all Books.
++  - Success response: `200 OK`.
++
++- `GET /books/{id}`
++  - Returns one Book by ID.
++  - Success response: `200 OK`.
++  - Invalid ID response: `400 Bad Request`.
++  - Book not found response: `404 Not Found`.
++
++- `POST /books`
++  - Creates a new Book.
++  - Success response: `201 Created`.
++  - Invalid input response: `400 Bad Request`.
++
++- `PUT /books/{id}`
++  - Updates an existing Book.
++  - Success response: `200 OK`.
++  - Invalid ID response: `400 Bad Request`.
++  - Book not found response: `404 Not Found`.
++
++- `DELETE /books/{id}`
++  - Deletes an existing Book.
++  - Success response: `200 OK`.
++  - Invalid ID response: `400 Bad Request`.
++  - Book not found response: `404 Not Found`.
++
++### Orders
++
++- `POST /orders`
++  - Creates an Order using `BookId` and `Quantity`.
++  - Reduces the Book stock through `BookService`.
++  - Success response: `201 Created`.
++  - Invalid quantity response: `400 Bad Request`.
++  - Insufficient stock response: `400 Bad Request`.
++  - Book not found response: `404 Not Found`.
++
++Example request:
++
++```json
++{
++  "bookId": 2,
++  "quantity": 3
++}
++```
++
++Example successful response:
++
++```json
++{
++  "message": "Order created successfully.",
++  "bookId": 2,
++  "quantity": 3,
++  "remainingStock": 4
++}
++```
++
++## HTTP Status Codes
++
++The API uses different HTTP status codes depending on the result:
++
++- `200 OK`
++  - Successful GET, PUT, or DELETE operation.
++
++- `201 Created`
++  - New Book or Order successfully created.
++
++- `400 Bad Request`
++  - Invalid Book ID.
++  - Empty Book title.
++  - Invalid Order quantity.
++  - Insufficient Book stock.
++
++- `404 Not Found`
++  - Requested Book does not exist.
++
++## Input Validation
++
++The API validates user input before completing operations.
++
++Validation includes:
++
++- Book ID must be greater than `0`.
++- Book title cannot be empty.
++- Required Book fields must contain valid values.
++- Order quantity must be greater than `0`.
++- Order quantity cannot exceed available stock.
++- Requested Book must exist.
++
++Validation errors return a clear response message that the client can act on.
++
++Examples:
++
++```json
++{
++  "message": "Book not found."
++}
++```
++
++```json
++{
++  "message": "Quantity must be greater than 0."
++}
++```
++
++```json
++{
++  "message": "Not enough stock available."
++}
++```
++
++## Swagger and OpenAPI
++
++- Swagger UI is enabled for API documentation and testing.
++- OpenAPI describes the available API endpoints.
++- Swagger allows GET, POST, PUT, and DELETE requests to be tested directly from the browser.
++- Swagger displays request bodies, response bodies, and HTTP status codes.
++
++Swagger includes:
++
++```text
++GET    /books
++GET    /books/{id}
++POST   /books
++PUT    /books/{id}
++DELETE /books/{id}
++POST   /orders
++```
++
++## API Validation Testing
++
++The following API scenarios were tested using Swagger:
++
++- `GET /books` → `200 OK`
++- Valid `POST /books` → `201 Created`
++- Invalid `POST /books` → `400 Bad Request`
++- Existing `GET /books/{id}` → `200 OK`
++- Missing Book → `404 Not Found`
++- Invalid Book ID → `400 Bad Request`
++- Valid `PUT /books/{id}` → `200 OK`
++- Valid `DELETE /books/{id}` → `200 OK`
++- Valid `POST /orders` → `201 Created`
++- Insufficient stock → `400 Bad Request`
++- Invalid Order quantity → `400 Bad Request`
++- Order with missing Book → `404 Not Found`
++
++## Current API Structure
++
++```text
++Library.API
++├── Controllers
++│   ├── BooksController.cs
++│   └── OrdersController.cs
++│
++├── DTOs
++│   └── OrderRequest.cs
++│
++├── Program.cs
++├── appsettings.json
++└── Library.API.http
++```
++
++## Automated tests and CI
++
++Requires the .NET 10 SDK. From the repository root:
++
++```sh
++dotnet restore library.slnx
++dotnet build library.slnx --configuration Release --no-restore
++dotnet test library.slnx --configuration Release --no-build
++dotnet run --project Library.API
++```
++
++The API applies EF Core migrations at startup. Its default database is
++`library/bookstore.db`. Integration tests use their own SQLite in-memory database;
++they do not modify that file.
++
++The existing 7 unit tests are supplemented by 10 HTTP integration cases in
++`Library Tests/ApiIntegrationTests.cs`. `LibraryApiFactory` uses
++`WebApplicationFactory<ApiAssemblyMarker>` to start the real API pipeline with
++real controllers, BookService, EfBookRepository, EF Core, and SQLite. Only the
++database registration is replaced. The normal startup migrations still execute.
++Every test case gets a fresh database and disposes it afterward.
++
++| Scenario | Expected result |
++| --- | --- |
++| Create book with stock 10, order 2, retrieve book again | 201; order reports 8; separate GET confirms persisted stock 8 |
++| Order more than available stock | 400; stock unchanged |
++| Order quantity 0 or -1 | 400; stock unchanged (2 cases) |
++| Buy all stock, then try another order | stock 0; subsequent order 400 |
++| Order a missing book | 404 |
++| Order with book ID 0 or -1 | 400 (2 cases) |
++| Create a book with empty title | 400; nothing saved |
++| Delete a book, then retrieve/order it | 404 for both operations |
++
++`.github/workflows/dotnet-tests.yml` runs on every push and pull request.
++It restores, builds, and runs `dotnet test` for the solution. There is no
++`continue-on-error` or command that masks a failing test exit code.
++TRX results are uploaded even after a test failure, when available.
++
++A failed workflow marks the commit/PR check red. To **enforce merge blocking**,
++a repository administrator must configure a rule for `main` requiring pull
++requests and the `Build and test` status check, with bypass restricted.
++A red check alone does not prove branch protection is enabled.
++
++See [CI submission and evidence guide](docs/CI-SUBMISSION.md) for the
++intentional-failure procedure and screenshot checklist.
+diff --git a/docs/CI-SUBMISSION.md b/docs/CI-SUBMISSION.md
+new file mode 100644
+--- /dev/null
++++ b/docs/CI-SUBMISSION.md
+@@ -0,0 +1,63 @@
++# CI submission / 自动测试提交说明
++
++## Objective / 目标
++
++Make correctness self-verifying on every push: run real API integration tests
++automatically and demonstrate that an incorrect assertion fails CI.
++
++## Implementation / 实现内容
++
++- .NET 10 solution with 7 existing unit tests and 10 new HTTP integration cases.
++- WebApplicationFactory runs the actual API endpoints and database migrations.
++- Each test uses isolated SQLite in-memory storage, keeping the application database safe.
++- Core flow: POST /books (stock 10) → POST /orders (quantity 2) → GET /books/{id} (stock 8).
++- Rejected orders verify that stock remains unchanged.
++- GitHub Actions runs restore, build and dotnet test on push and pull_request.
++- TRX test reports are retained as workflow artifacts.
++
++The API's order endpoint updates inventory and returns an order summary; this
++project does not persist a separate order entity. These tests verify its current
++HTTP contract and persisted inventory changes.
++
++## Evidence status / 证据状态
++
++Implementation prepared; CI execution and screenshots must be verified before
++marking the assignment complete. Do not treat this document as a passing test report.
++
++## Intentional failure / 故意失败验证
++
++1. Start from a passing run on the working branch.
++2. In CreateBook_OrderIt_StockDecrementsAndPersists, temporarily change
++   `Assert.Equal(8, await GetStock(id));` to
++   `Assert.Equal(9, await GetStock(id));`.
++3. Commit and push that change. Keep the real dotnet test command unchanged.
++4. Confirm the Test step fails because expected stock 9 differs from actual stock 8.
++   A restore/build failure is not sufficient evidence.
++5. Capture the failing run and its assertion output.
++6. Restore the expected stock to 8, commit and push again.
++7. Confirm the latest run passes and capture its summary.
++
++## Screenshots / 截图要求
++
++- Green: repository name, workflow run, commit, successful Build and test job,
++  and test summary (expected total: 17 passing cases).
++- Red: failed Test step, test name, expected 9 versus actual 8, and nonzero exit.
++- Optional merge-blocking proof: PR shows merging blocked by a required failed check.
++- Save real screenshots as ci-green.png and ci-red.png and include them with submission.
++  Screenshots have not been generated or fabricated by this document.
++
++## Merge enforcement / 禁止合并失败代码
++
++Workflow failure and merge protection are separate. In repository settings,
++configure a main-branch rule requiring a pull request and the Build and test
++check. Restrict bypass as appropriate. Record actual settings or a blocked PR
++before claiming that merging is enforced.
++
++## Handoff / 交付
++
++Submit the repository/PR link, README, green and red run links, and screenshots.
++Only reassign the original task once its platform, task link and intended
++assignee are known and the work is verified.
++
++中文说明：先保存真实的红色失败证据，再把断言恢复为 8，并保存绿色成功证据。
++最终代码必须恢复为正确版本。若未配置分支保护，不能写成“系统已禁止合并”。
