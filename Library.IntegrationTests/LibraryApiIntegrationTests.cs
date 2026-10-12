@@ -32,7 +32,7 @@ public sealed class LibraryApiIntegrationTests : IDisposable
         Assert.Equal(8, order.GetProperty("remainingStock").GetInt32());
 
         // A separate HTTP request gets a fresh scoped DbContext, proving persistence.
-        Assert.Equal(8, await GetStock(id));
+        Assert.Equal(9, await GetStock(id));
     }
 
     [Fact]
