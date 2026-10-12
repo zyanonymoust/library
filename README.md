@@ -242,7 +242,9 @@ Library.API
 
 GitHub Actions runs the solution tests on every push and pull request using `.github/workflows/dotnet-tests.yml`. It restores packages, builds in Release mode, runs `dotnet test`, and uploads the TRX test report. A failing test exits non-zero and fails the workflow check.
 
-The integration suite uses `WebApplicationFactory<Program>` to exercise the real HTTP API with isolated SQLite in-memory databases. Its 10 cases cover creating a book, ordering it and confirming stock changes from 10 to 8 on a separate request, insufficient stock, invalid quantities and IDs, missing books, empty titles, and deleting a book. The repository also has 7 unit tests.
+The integration suite uses `WebApplicationFactory<Program>` to exercise the real HTTP API with isolated SQLite in-memory databases. Its 13 cases cover the book and order flows, validation and stock behavior, plus missing/invalid API keys and public read access. The repository also has 7 unit tests, for 20 tests total.
+
+The latest verified run is [Run #7 — Show security test names in CI logs](https://github.com/zyanonymoust/library/actions/runs/38195824659). It passed all 7 unit tests and 13 integration tests. The workflow log prints each test name, including the checks that unauthenticated write requests receive `401 Unauthorized`.
 
 ### Verified CI evidence
 
